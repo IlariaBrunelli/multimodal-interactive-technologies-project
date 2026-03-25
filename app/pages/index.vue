@@ -43,27 +43,28 @@ function iconPath(icon: string) {
     <div class="background-orb orb-left" />
     <div class="background-orb orb-right" />
 
-    <section class="home-panel">
-      <div class="top-bar">
-        <div class="top-spacer" />
-        <NuxtLink class="login-link" to="/login" aria-label="Open login page">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"
-            />
-          </svg>
-        </NuxtLink>
-      </div>
+    <NuxtLink class="login-link" to="/login" aria-label="Open login page">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"
+        />
+      </svg>
+    </NuxtLink>
 
+    <section class="home-panel">
       <div class="hero-card">
         <p class="eyebrow">Home</p>
         <h1>Start Guided Tour.</h1>
         <p class="hero-copy">
-          This top container is ready for your primary action, with navigation shortcuts placed directly below it.
+          You can use both AR mode for an immersive experience
         </p>
-        <button type="button" class="hero-button">Main Button</button>
+        <div class="hero-actions">
+          <button type="button" class="hero-button">AR Mode</button>
+          <button type="button" class="hero-button">Text Mode</button>
+        </div>
       </div>
 
+      <h2 class="section-title">Main services</h2>
       <nav class="quick-nav" aria-label="Quick navigation">
         <NuxtLink
           v-for="link in quickLinks"
@@ -141,14 +142,11 @@ function iconPath(icon: string) {
   z-index: 1;
 }
 
-.top-bar {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
 .login-link {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 2;
   width: 52px;
   height: 52px;
   display: grid;
@@ -221,8 +219,23 @@ function iconPath(icon: string) {
   box-shadow: 0 20px 34px rgba(217, 119, 6, 0.35);
 }
 
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.section-title {
+  margin: 28px 0 14px;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #7c2d12;
+  letter-spacing: 0.04em;
+}
+
 .quick-nav {
-  margin-top: 18px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
@@ -264,11 +277,15 @@ function iconPath(icon: string) {
 
 @media (max-width: 640px) {
   .home-shell {
-    padding: 20px 16px 28px;
+    padding: 88px 16px 28px;
   }
 
   .hero-card {
     padding: 26px 20px;
+  }
+
+  .hero-actions {
+    gap: 14px;
   }
 
   .quick-nav {
