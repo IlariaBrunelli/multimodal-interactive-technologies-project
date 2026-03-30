@@ -1,7 +1,7 @@
 <template>
   <section class="page-shell">
     <NuxtLink to="/">Back home</NuxtLink>
-    <h1>Explore</h1>
+    <h1>Find Classrooms</h1>
     <p>This page is connected from the homepage icon section.</p>
   </section>
 </template>

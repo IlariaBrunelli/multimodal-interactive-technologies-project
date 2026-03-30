@@ -1,26 +1,43 @@
 <script setup lang="ts">
+type ChatMessage = {
+  role: 'assistant' | 'user'
+  text: string
+}
+
 const quickLinks = [
   {
-    title: 'Explore',
+    title: 'Find Classrooms',
     to: '/explore',
     icon: 'spark'
   },
   {
-    title: 'Favorites',
+    title: 'Calendar',
     to: '/favorites',
     icon: 'heart'
   },
   {
-    title: 'Orders',
+    title: 'Campus Services',
     to: '/orders',
     icon: 'bag'
   },
-  {
-    title: 'Support',
-    to: '/support',
-    icon: 'chat'
-  }
+
 ] as const
+
+const starterPrompts = [
+  'Where is the admissions office?',
+  'What are the library opening hours?',
+  'How do I reach building C?',
+  'Who can help me with campus Wi-Fi?'
+] as const
+
+const chatMessages = ref<ChatMessage[]>([
+  {
+    role: 'assistant',
+    text: 'Hello, I am the campus AI assistant. Ask me about buildings, services, opening hours, or support points.'
+  }
+])
+
+const userPrompt = ref('')
 
 function iconPath(icon: string) {
   switch (icon) {
@@ -30,11 +47,56 @@ function iconPath(icon: string) {
       return 'M12 21.35 10.55 20C5.4 15.24 2 12.09 2 8.25 2 5.1 4.42 2.75 7.5 2.75c1.74 0 3.41.81 4.5 2.09 1.09-1.28 2.76-2.09 4.5-2.09 3.08 0 5.5 2.35 5.5 5.5 0 3.84-3.4 6.99-8.55 11.76L12 21.35Z'
     case 'bag':
       return 'M7 7V6a5 5 0 0 1 10 0v1h3v14H4V7h3Zm2 0h6V6a3 3 0 1 0-6 0v1Zm1.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z'
-    case 'chat':
-      return 'M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 5h10v2H7V9Zm0 4h7v2H7v-2Z'
     default:
       return ''
   }
+}
+
+function answerCampusQuestion(question: string) {
+  const normalized = question.toLowerCase()
+
+  if (normalized.includes('library')) {
+    return 'The main library is open from 8:00 to 20:00 on weekdays. During exams, extended evening hours may be available.'
+  }
+
+  if (normalized.includes('wifi') || normalized.includes('wi-fi') || normalized.includes('internet')) {
+    return 'For campus Wi-Fi support, start from the digital help desk near the main hall or contact IT support through the student portal.'
+  }
+
+  if (normalized.includes('admissions') || normalized.includes('office')) {
+    return 'Admissions support is usually located in the welcome area near the main entrance. This draft can later connect to live campus data for exact room details.'
+  }
+
+  if (normalized.includes('building') || normalized.includes('classroom') || normalized.includes('reach')) {
+    return 'You can ask for a building or classroom and the assistant can guide you with directions, nearby landmarks, and accessible routes.'
+  }
+
+  return 'This is a first chatbot draft: it can welcome users, answer common campus questions, and later connect to live data, maps, and university services.'
+}
+
+function useStarterPrompt(prompt: string) {
+  userPrompt.value = prompt
+  submitChat()
+}
+
+function submitChat() {
+  const question = userPrompt.value.trim()
+
+  if (!question) {
+    return
+  }
+
+  chatMessages.value.push({
+    role: 'user',
+    text: question
+  })
+
+  chatMessages.value.push({
+    role: 'assistant',
+    text: answerCampusQuestion(question)
+  })
+
+  userPrompt.value = ''
 }
 </script>
 
@@ -56,7 +118,7 @@ function iconPath(icon: string) {
         <p class="eyebrow">Home</p>
         <h1>Start Guided Tour.</h1>
         <p class="hero-copy">
-          You can use both AR mode for an immersive experience
+          You can use AR mode for an immersive experience
         </p>
         <div class="hero-actions">
           <button type="button" class="hero-button">AR Mode</button>
@@ -80,6 +142,59 @@ function iconPath(icon: string) {
           <span>{{ link.title }}</span>
         </NuxtLink>
       </nav>
+
+      <section class="chatbot-section" aria-labelledby="campus-ai-title">
+        <div class="chatbot-copy">
+          <p class="eyebrow">New</p>
+          <div class="chatbot-heading">
+            <h2 id="campus-ai-title">Campus AI Assistant</h2>
+            <span class="chatbot-badge">Draft experience</span>
+          </div>
+          <p class="chatbot-description">
+            A first chatbot concept for asking questions about the campus, services,
+            offices, directions, and student support.
+          </p>
+
+          <div class="prompt-list" aria-label="Suggested prompts">
+            <button
+              v-for="prompt in starterPrompts"
+              :key="prompt"
+              type="button"
+              class="prompt-chip"
+              @click="useStarterPrompt(prompt)"
+            >
+              {{ prompt }}
+            </button>
+          </div>
+        </div>
+
+        <div class="chatbot-card">
+          <div class="chatbot-window" aria-live="polite">
+            <div
+              v-for="(message, index) in chatMessages"
+              :key="`${message.role}-${index}`"
+              class="message-row"
+              :class="`message-row--${message.role}`"
+            >
+              <div class="message-bubble" :class="`message-bubble--${message.role}`">
+                {{ message.text }}
+              </div>
+            </div>
+          </div>
+
+          <form class="chatbot-form" @submit.prevent="submitChat">
+            <label class="sr-only" for="campus-ai-input">Ask the campus assistant</label>
+            <input
+              id="campus-ai-input"
+              v-model="userPrompt"
+              type="text"
+              class="chatbot-input"
+              placeholder="Ask something about the campus..."
+            >
+            <button type="submit" class="chatbot-send">Send</button>
+          </form>
+        </div>
+      </section>
     </section>
   </main>
 </template>
@@ -241,6 +356,176 @@ function iconPath(icon: string) {
   gap: 14px;
 }
 
+.chatbot-section {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.chatbot-copy,
+.chatbot-card {
+  border-radius: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.chatbot-copy {
+  padding: 28px;
+}
+
+.chatbot-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.chatbot-heading h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  color: #7c2d12;
+}
+
+.chatbot-badge {
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 237, 213, 0.95);
+  color: #9a3412;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.chatbot-description {
+  margin: 0;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.prompt-list {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.prompt-chip {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(255, 237, 213, 0.95), rgba(254, 215, 170, 0.9));
+  color: #9a3412;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.prompt-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 22px rgba(217, 119, 6, 0.18);
+}
+
+.chatbot-card {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 235, 0.95) 0%, rgba(255, 255, 255, 0.82) 100%);
+}
+
+.chatbot-window {
+  min-height: 300px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  display: grid;
+  gap: 12px;
+}
+
+.message-row {
+  display: flex;
+}
+
+.message-row--assistant {
+  justify-content: flex-start;
+}
+
+.message-row--user {
+  justify-content: flex-end;
+}
+
+.message-bubble {
+  max-width: min(90%, 380px);
+  padding: 14px 16px;
+  border-radius: 18px;
+  line-height: 1.55;
+  font-size: 0.96rem;
+}
+
+.message-bubble--assistant {
+  background: #fff7ed;
+  color: #7c2d12;
+  border-top-left-radius: 6px;
+}
+
+.message-bubble--user {
+  background: linear-gradient(135deg, var(--primary), #f97316);
+  color: #fff;
+  border-top-right-radius: 6px;
+}
+
+.chatbot-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.chatbot-input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  padding: 14px 16px;
+  font: inherit;
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.chatbot-input:focus {
+  outline: 2px solid rgba(217, 119, 6, 0.2);
+  border-color: rgba(217, 119, 6, 0.45);
+}
+
+.chatbot-send {
+  border: 0;
+  border-radius: 18px;
+  padding: 0 20px;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #c2410c, #f97316);
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .nav-tile {
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -290,6 +575,29 @@ function iconPath(icon: string) {
 
   .quick-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chatbot-section {
+    grid-template-columns: 1fr;
+  }
+
+  .chatbot-copy,
+  .chatbot-card {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .chatbot-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chatbot-form {
+    grid-template-columns: 1fr;
+  }
+
+  .chatbot-send {
+    min-height: 48px;
   }
 }
 </style>
