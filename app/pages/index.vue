@@ -1,27 +1,46 @@
 <script setup lang="ts">
+type MenuButton = {
+  id: number
+  text: string
+  link: string
+  iconPath: string
+  colorExpanded: string
+  colorCollapsed: string
+}
+
 type ChatMessage = {
   role: 'assistant' | 'user'
   text: string
 }
 
-const quickLinks = [
-  {
-    title: 'Find Classrooms',
-    to: '/explore',
-    icon: 'spark'
-  },
-  {
-    title: 'Calendar',
-    to: '/favorites',
-    icon: 'heart'
-  },
-  {
-    title: 'Campus Services',
-    to: '/orders',
-    icon: 'bag'
-  },
+const isExpanded = ref(false)
 
-] as const
+const buttons = ref<MenuButton[]>([
+  {
+    id: 1,
+    text: 'Profilo',
+    link: '/profilo',
+    iconPath: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+    colorExpanded: 'bg-blue-50 text-blue-600 border-blue-500 hover:bg-blue-100',
+    colorCollapsed: 'bg-white text-blue-500 border-blue-400 hover:bg-blue-50'
+  },
+  {
+    id: 2,
+    text: 'Report',
+    link: '/statistiche',
+    iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+    colorExpanded: 'bg-emerald-50 text-emerald-600 border-emerald-500 hover:bg-emerald-100',
+    colorCollapsed: 'bg-white text-emerald-500 border-emerald-400 hover:bg-emerald-50'
+  },
+  {
+    id: 3,
+    text: 'Impostazioni',
+    link: '/impostazioni',
+    iconPath: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    colorExpanded: 'bg-purple-50 text-purple-600 border-purple-500 hover:bg-purple-100',
+    colorCollapsed: 'bg-white text-purple-500 border-purple-400 hover:bg-purple-50'
+  }
+])
 
 const starterPrompts = [
   'Where is the admissions office?',
@@ -39,16 +58,17 @@ const chatMessages = ref<ChatMessage[]>([
 
 const userPrompt = ref('')
 
-function iconPath(icon: string) {
-  switch (icon) {
-    case 'spark':
-      return 'M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6-4.6-1.9 4.6-1.9L12 3.5Zm6.5 11 1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1 1-2.5ZM6.5 16l1.2 2.8 2.8 1.2-2.8 1.2L6.5 24l-1.2-2.8L2.5 20l2.8-1.2L6.5 16Z'
-    case 'heart':
-      return 'M12 21.35 10.55 20C5.4 15.24 2 12.09 2 8.25 2 5.1 4.42 2.75 7.5 2.75c1.74 0 3.41.81 4.5 2.09 1.09-1.28 2.76-2.09 4.5-2.09 3.08 0 5.5 2.35 5.5 5.5 0 3.84-3.4 6.99-8.55 11.76L12 21.35Z'
-    case 'bag':
-      return 'M7 7V6a5 5 0 0 1 10 0v1h3v14H4V7h3Zm2 0h6V6a3 3 0 1 0-6 0v1Zm1.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z'
-    default:
-      return ''
+function toggleExpand() {
+  isExpanded.value = !isExpanded.value
+
+  if (import.meta.client) {
+    document.body.style.overflow = isExpanded.value ? 'hidden' : 'auto'
+  }
+}
+
+function goToPage(button: MenuButton) {
+  if (import.meta.client) {
+    window.alert(`Navigo a: ${button.link}`)
   }
 }
 
@@ -98,6 +118,12 @@ function submitChat() {
 
   userPrompt.value = ''
 }
+
+onBeforeUnmount(() => {
+  if (import.meta.client) {
+    document.body.style.overflow = 'auto'
+  }
+})
 </script>
 
 <template>
@@ -126,22 +152,136 @@ function submitChat() {
         </div>
       </div>
 
-      <h2 class="section-title">Main services</h2>
-      <nav class="quick-nav" aria-label="Quick navigation">
-        <NuxtLink
-          v-for="link in quickLinks"
-          :key="link.to"
-          :to="link.to"
-          class="nav-tile"
-        >
-          <span class="nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path :d="iconPath(link.icon)" />
-            </svg>
-          </span>
-          <span>{{ link.title }}</span>
-        </NuxtLink>
-      </nav>
+      <section class="mt-8">
+        <div class="app-container">
+          <div
+            class="w-full flex items-center justify-center transition-colors duration-[800ms]"
+            :class="isExpanded ? 'fixed inset-0 z-40 bg-white' : 'rounded-[2.5rem] bg-gray-50/90 p-4'"
+          >
+            <div
+              class="bg-white transition-all duration-[800ms] ease-[cubic-bezier(0.34,1.1,0.64,1)] flex flex-col overflow-hidden"
+              :class="isExpanded
+                ? 'w-[100vw] h-[100vh] p-8 sm:p-12 rounded-none z-50'
+                : 'w-full max-w-xs h-60 p-6 rounded-[2rem] shadow-xl border border-gray-100 cursor-pointer hover:shadow-2xl relative'"
+              @click="!isExpanded && toggleExpand()"
+            >
+              <div
+                class="flex items-center justify-between transition-all duration-[800ms]"
+                :class="isExpanded ? 'mb-16 sm:mb-20' : 'mb-6'"
+              >
+                <span
+                  class="font-black tracking-tight text-gray-900 transition-all duration-[800ms]"
+                  :class="isExpanded ? 'text-5xl sm:text-6xl' : 'text-xl'"
+                >
+                  Main Services
+                </span>
+
+                <button
+                  type="button"
+                  :aria-expanded="isExpanded"
+                  :aria-label="isExpanded ? 'Close services menu' : 'Open services menu'"
+                  class="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-all duration-[800ms] focus:outline-none z-20 relative"
+                  :class="isExpanded ? 'text-gray-400' : 'text-blue-500'"
+                  @click.stop="toggleExpand"
+                >
+                  <div class="relative w-7 h-7">
+                    <svg
+                      :class="isExpanded ? 'opacity-0 scale-50 rotate-90' : 'opacity-100 scale-100 rotate-0'"
+                      class="absolute inset-0 w-7 h-7 transition-all duration-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <svg
+                      :class="isExpanded ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-50 -rotate-90'"
+                      class="absolute inset-0 w-7 h-7 transition-all duration-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                </button>
+              </div>
+
+              <div
+                class="transition-all duration-[800ms] flex flex-col w-full"
+                :class="isExpanded ? 'flex-1 justify-start max-w-3xl mx-auto' : 'justify-start'"
+              >
+                <div class="relative w-full" :style="{ height: isExpanded ? '190px' : '56px' }">
+                  <button
+                    v-for="(button, index) in buttons"
+                    :key="button.id"
+                    type="button"
+                    class="absolute transition-all duration-[800ms] flex items-center justify-center overflow-hidden group focus:outline-none border-2"
+                    :style="{
+                      transitionDelay: isExpanded ? `${index * 120}ms` : `${(2 - index) * 40}ms`,
+                      transitionTimingFunction: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
+                      top: isExpanded ? (index === 2 ? '104px' : '0px') : '0px',
+                      left: isExpanded ? (index === 1 ? 'calc(50% + 10px)' : '0px') : `${index * 68}px`,
+                      width: isExpanded ? (index === 2 ? '100%' : 'calc(50% - 10px)') : '56px',
+                      height: isExpanded ? '80px' : '56px',
+                      borderRadius: isExpanded ? '1.5rem' : '50%'
+                    }"
+                    :class="isExpanded
+                      ? `shadow-lg ${button.colorExpanded}`
+                      : `${button.colorCollapsed} shadow-sm`"
+                    @click.stop="goToPage(button)"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="absolute transition-all duration-[500ms] w-7 h-7"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(2 - index) * 40 + 350}ms` }"
+                      :class="isExpanded ? 'opacity-0 scale-50' : 'opacity-100 scale-100'"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
+                    </svg>
+
+                    <div
+                      class="flex items-center space-x-4 transition-all duration-[500ms]"
+                      :style="{ transitionDelay: isExpanded ? `${index * 120 + 400}ms` : '0ms' }"
+                      :class="isExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-75'"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="w-7 h-7 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
+                      </svg>
+                      <span class="font-bold text-xl sm:text-2xl tracking-tight">{{ button.text }}</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <p
+                class="transition-all duration-300 text-sm font-medium text-gray-400 absolute bottom-6 left-6"
+                :class="isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100 delay-500'"
+              >
+                Tocca per esplorare
+              </p>
+
+              <div
+                class="transition-all duration-[800ms] text-center text-gray-300 pb-8"
+                :class="isExpanded ? 'opacity-100 delay-[800ms]' : 'opacity-0 absolute bottom-0 pointer-events-none w-full left-0'"
+              >
+                <p class="uppercase tracking-widest text-xs font-bold">Menu Navigazione</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="chatbot-section" aria-labelledby="campus-ai-title">
         <div class="chatbot-copy">
@@ -341,21 +481,6 @@ function submitChat() {
   flex-wrap: wrap;
 }
 
-.section-title {
-  margin: 28px 0 14px;
-  text-align: center;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #7c2d12;
-  letter-spacing: 0.04em;
-}
-
-.quick-nav {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-}
-
 .chatbot-section {
   margin-top: 30px;
   display: grid;
@@ -526,40 +651,6 @@ function submitChat() {
   border: 0;
 }
 
-.nav-tile {
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 22px;
-  padding: 18px 14px;
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  text-align: center;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.nav-tile:hover {
-  transform: translateY(-3px);
-  border-color: rgba(217, 119, 6, 0.34);
-  box-shadow: 0 18px 30px rgba(217, 119, 6, 0.14);
-}
-
-.nav-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 237, 213, 0.9);
-}
-
-.nav-icon svg {
-  width: 22px;
-  height: 22px;
-  fill: var(--primary-dark);
-}
-
 @media (max-width: 640px) {
   .home-shell {
     padding: 88px 16px 28px;
@@ -571,10 +662,6 @@ function submitChat() {
 
   .hero-actions {
     gap: 14px;
-  }
-
-  .quick-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .chatbot-section {
