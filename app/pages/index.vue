@@ -26,6 +26,11 @@ type ChatMessage = {
   text: string
 }
 
+type CampusChatResponse = {
+  reply: string
+  sessionId: string
+}
+
 // Tipo minimo per usare la Web Speech API senza importare librerie esterne.
 type BrowserSpeechRecognitionResult = {
   readonly [index: number]: { transcript: string } | undefined
@@ -100,10 +105,10 @@ const buttons = ref<MenuButton[]>([
 
 // Array costante con i suggerimenti iniziali della chat.
 const starterPrompts = [
-  'Where is the admissions office?',
-  'What are the library opening hours?',
-  'How do I reach building C?',
-  'Who can help me with campus Wi-Fi?'
+  'Che lezione ho lunedi prossimo?',
+  'Quali lezioni ho oggi?',
+  'A che ora inizia la prossima lezione?',
+  'Dove si tiene la prossima lezione?'
 // as const rende i valori "letterali" e non semplici stringhe generiche.
 ] as const
 
@@ -112,12 +117,18 @@ const starterPrompts = [
 const chatMessages = ref<ChatMessage[]>([
   {
     role: 'assistant',
-    text: 'Hello, I am the campus AI assistant. Ask me about buildings, services, opening hours, or support points.'
+    text: 'Ciao, sono il Campus AI Assistant. Posso controllare il calendario e aiutarti con le lezioni.'
   }
 ])
 
 // Testo scritto dall'utente nell'input della chat.
 const userPrompt = ref('')
+
+// Stato di caricamento della chat mentre aspettiamo la risposta dell'agente n8n.
+const isChatLoading = ref(false)
+
+// Chiave usata per mantenere la stessa sessione n8n nello stesso browser.
+const campusChatSessionStorageKey = 'campus-ai-assistant-session-id'
 
 // Controlla se il pannello classroom navigation e visibile nella stessa pagina.
 const showClassroomNavigation = ref(false)
@@ -294,34 +305,30 @@ function submitClassroomQuestion() {
   classroomPrompt.value = ''
 }
 
-// Questa funzione prende una domanda e restituisce una risposta testuale.
-function answerCampusQuestion(question: string) {
-  // toLowerCase rende tutto minuscolo, cosi i controlli non dipendono da maiuscole/minuscole.
-  const normalized = question.toLowerCase()
+function createCampusChatSessionId() {
+  const browserCrypto = import.meta.client
+    ? window.crypto as (Crypto & { randomUUID?: () => string }) | undefined
+    : undefined
 
-  // includes controlla se una parola e presente nella domanda.
-  if (normalized.includes('library')) {
-    // return termina la funzione e restituisce questa stringa.
-    return 'The main library is open from 8:00 to 20:00 on weekdays. During exams, extended evening hours may be available.'
+  return browserCrypto?.randomUUID?.() ?? `campus-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+// Restituisce una sessione stabile per permettere a n8n di usare la memoria della conversazione.
+function getCampusChatSessionId() {
+  if (!import.meta.client) {
+    return createCampusChatSessionId()
   }
 
-  // || significa "oppure": basta che una delle condizioni sia vera.
-  if (normalized.includes('wifi') || normalized.includes('wi-fi') || normalized.includes('internet')) {
-    return 'For campus Wi-Fi support, start from the digital help desk near the main hall or contact IT support through the student portal.'
+  const existingSessionId = window.localStorage.getItem(campusChatSessionStorageKey)
+
+  if (existingSessionId) {
+    return existingSessionId
   }
 
-  // Qui rispondiamo alle domande che contengono admissions oppure office.
-  if (normalized.includes('admissions') || normalized.includes('office')) {
-    return 'Admissions support is usually located in the welcome area near the main entrance. This draft can later connect to live campus data for exact room details.'
-  }
+  const sessionId = createCampusChatSessionId()
+  window.localStorage.setItem(campusChatSessionStorageKey, sessionId)
 
-  // Qui rispondiamo alle domande su edificio, aula o percorso.
-  if (normalized.includes('building') || normalized.includes('classroom') || normalized.includes('reach')) {
-    return 'You can ask for a building or classroom and the assistant can guide you with directions, nearby landmarks, and accessible routes.'
-  }
-
-  // Risposta di fallback: viene usata se nessun if precedente ha fatto return.
-  return 'This is a first chatbot draft: it can welcome users, answer common campus questions, and later connect to live data, maps, and university services.'
+  return sessionId
 }
 
 // Questa funzione viene usata quando l'utente clicca un suggerimento.
@@ -333,14 +340,16 @@ function useStarterPrompt(prompt: string) {
 }
 
 // Questa funzione gestisce l'invio del form della chat.
-function submitChat() {
+async function submitChat() {
   // trim rimuove spazi vuoti all'inizio e alla fine.
   const question = userPrompt.value.trim()
 
   // Se dopo trim non rimane testo, usciamo dalla funzione.
-  if (!question) {
+  if (!question || isChatLoading.value) {
     return
   }
+
+  isChatLoading.value = true
 
   // push aggiunge un nuovo messaggio dell'utente alla lista reattiva.
   chatMessages.value.push({
@@ -348,14 +357,36 @@ function submitChat() {
     text: question
   })
 
-  // Aggiunge subito anche la risposta dell'assistente.
-  chatMessages.value.push({
+  // Aggiunge un messaggio temporaneo mentre la route server interroga n8n.
+  const assistantMessageIndex = chatMessages.value.push({
     role: 'assistant',
-    text: answerCampusQuestion(question)
-  })
+    text: 'Sto controllando il calendario...'
+  }) - 1
 
   // Svuota l'input dopo l'invio.
   userPrompt.value = ''
+
+  try {
+    const response = await $fetch<CampusChatResponse>('/api/campus-chat', {
+      method: 'POST',
+      body: {
+        message: question,
+        sessionId: getCampusChatSessionId()
+      }
+    })
+
+    chatMessages.value[assistantMessageIndex] = {
+      role: 'assistant',
+      text: response.reply
+    }
+  } catch {
+    chatMessages.value[assistantMessageIndex] = {
+      role: 'assistant',
+      text: 'Non riesco a contattare l agente del calendario in questo momento. Riprova tra poco.'
+    }
+  } finally {
+    isChatLoading.value = false
+  }
 }
 
 // onBeforeUnmount viene eseguito quando il componente sta per essere rimosso dalla pagina.
@@ -647,11 +678,11 @@ onBeforeUnmount(() => {
           <p class="eyebrow">New</p>
           <div class="chatbot-heading">
             <h2 id="campus-ai-title">Campus AI Assistant</h2>
-            <span class="chatbot-badge">Draft experience</span>
+            <span class="chatbot-badge">Calendario lezioni</span>
           </div>
           <p class="chatbot-description">
-            A first chatbot concept for asking questions about the campus, services,
-            offices, directions, and student support.
+            Chiedi informazioni sulle lezioni, sugli orari e sui prossimi impegni
+            salvati nel calendario.
           </p>
 
           <!-- Lista dei suggerimenti: ogni prompt genera un bottone. -->
@@ -698,10 +729,13 @@ onBeforeUnmount(() => {
               v-model="userPrompt"
               type="text"
               class="chatbot-input"
-              placeholder="Ask something about the campus..."
+              :placeholder="isChatLoading ? 'Attendo la risposta...' : 'Chiedi qualcosa sulle lezioni...'"
+              :disabled="isChatLoading"
             >
             <!-- type="submit" invia il form e quindi attiva @submit.prevent sopra. -->
-            <button type="submit" class="chatbot-send">Send</button>
+            <button type="submit" class="chatbot-send" :disabled="isChatLoading">
+              {{ isChatLoading ? 'Invio...' : 'Invia' }}
+            </button>
           </form>
         </div>
       </section>
@@ -1242,6 +1276,11 @@ onBeforeUnmount(() => {
   border-color: rgba(217, 119, 6, 0.45);
 }
 
+.chatbot-input:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 /* Pulsante invio della chat. */
 .chatbot-send {
   border: 0;
@@ -1252,6 +1291,11 @@ onBeforeUnmount(() => {
   color: #fff;
   background: linear-gradient(135deg, #c2410c, #f97316);
   cursor: pointer;
+}
+
+.chatbot-send:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 /* Classe standard per testo visibile agli screen reader ma nascosto graficamente. */
