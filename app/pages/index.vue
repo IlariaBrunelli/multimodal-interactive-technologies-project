@@ -374,7 +374,7 @@ onBeforeUnmount(() => {
   <!-- <template> contiene l'HTML del componente. Qui possiamo usare anche sintassi speciale di Vue. -->
   <!-- class="..." assegna classi CSS statiche: alcune sono classi locali, altre sono classi Tailwind. -->
   <main class="home-shell">
-    <!-- Div decorativi vuoti: lo slash finale indica che il tag si chiude subito. -->
+    <!-- Div decorativi vuoti -->
     <div class="background-orb orb-left" />
     <div class="background-orb orb-right" />
 
