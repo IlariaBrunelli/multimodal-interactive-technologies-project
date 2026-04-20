@@ -101,10 +101,7 @@ const buttons = ref<MenuButton[]>([
 // Array costante con i suggerimenti iniziali della chat.
 const starterPrompts = [
   'Where is the admissions office?',
-  'What are the library opening hours?',
-  'How do I reach building C?',
-  'Who can help me with campus Wi-Fi?'
-// as const rende i valori "letterali" e non semplici stringhe generiche.
+  'What are the library opening hours?'
 ] as const
 
 // Lista reattiva dei messaggi della chat.
@@ -112,7 +109,7 @@ const starterPrompts = [
 const chatMessages = ref<ChatMessage[]>([
   {
     role: 'assistant',
-    text: 'Hello, I am the campus AI assistant. Ask me about buildings, services, opening hours, or support points.'
+    text: 'A first chatbot concept for asking questions about the campus, services, offices, directions, and student support.'
   }
 ])
 
@@ -150,7 +147,7 @@ function toggleExpand() {
   // Serve per evitare errori lato server, dove document non esiste.
   if (import.meta.client) {
     // Se il menu e aperto blocchiamo lo scroll della pagina; se e chiuso lo riattiviamo.
-    document.body.style.overflow = isExpanded.value ? 'hidden' : 'auto'
+    document.body.style.overflow = isExpanded.value ? 'hidden' : 'hidden'
   }
 }
 
@@ -177,7 +174,7 @@ function openClassroomNavigation() {
   isExpanded.value = false
 
   if (import.meta.client) {
-    document.body.style.overflow = 'auto'
+    document.body.style.overflow = 'hidden'
   }
 
   // nextTick aspetta che Vue aggiorni il DOM prima di cercare l'elemento da scrollare.
@@ -371,26 +368,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- <template> contiene l'HTML del componente. Qui possiamo usare anche sintassi speciale di Vue. -->
-  <!-- class="..." assegna classi CSS statiche: alcune sono classi locali, altre sono classi Tailwind. -->
   <main class="home-shell">
-    <!-- Div decorativi vuoti -->
     <div class="background-orb orb-left" />
     <div class="background-orb orb-right" />
 
-    <!-- NuxtLink e il componente Nuxt per creare link interni senza ricaricare tutta la pagina. -->
-    <!-- to="/login" indica la rotta di destinazione. aria-label aiuta screen reader e accessibilita. -->
     <NuxtLink class="login-link" to="/login" aria-label="Open login page">
-      <!-- svg disegna un'icona vettoriale; aria-hidden evita che venga letta come contenuto testuale. -->
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <!-- d contiene le coordinate del disegno SVG. -->
-        <path
-          d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"
-        />
+        <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
       </svg>
     </NuxtLink>
 
-    <!-- section raggruppa una parte della pagina. -->
     <section class="home-panel">
       <!-- Card principale della pagina. -->
       <div class="hero-card">
@@ -406,16 +393,12 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Sezione del menu animato dei servizi. -->
-      <section class="mt-8">
+      <section class="services-menu-section">
         <div class="app-container">
-          <!-- :class e abbreviazione di v-bind:class: la classe cambia in base a una variabile JS. -->
-          <!-- Operatore ternario: condizione ? valore_se_true : valore_se_false. -->
           <div
             class="w-full flex items-center justify-center transition-colors duration-[800ms]"
             :class="isExpanded ? 'fixed inset-0 z-40 bg-white' : 'rounded-[2.5rem] bg-gray-50/90 p-4'"
           >
-            <!-- @click e abbreviazione di v-on:click. Se il menu non e aperto, chiama toggleExpand(). -->
-            <!-- && significa: esegue la seconda parte solo se la prima e vera. -->
             <div
               class="bg-white transition-all duration-[800ms] ease-[cubic-bezier(0.34,1.1,0.64,1)] flex flex-col overflow-hidden"
               :class="isExpanded
@@ -423,12 +406,10 @@ onBeforeUnmount(() => {
                 : 'w-full max-w-xs h-60 p-6 rounded-[2rem] shadow-xl border border-gray-100 cursor-pointer hover:shadow-2xl relative'"
               @click="!isExpanded && toggleExpand()"
             >
-              <!-- Margin-bottom diverso a seconda che il menu sia aperto o chiuso. -->
               <div
                 class="flex items-center justify-between transition-all duration-[800ms]"
                 :class="isExpanded ? 'mb-16 sm:mb-20' : 'mb-6'"
               >
-                <!-- Testo piu grande quando il menu e espanso. -->
                 <span
                   class="font-black tracking-tight text-gray-900 transition-all duration-[800ms]"
                   :class="isExpanded ? 'text-5xl sm:text-6xl' : 'text-xl'"
@@ -436,8 +417,6 @@ onBeforeUnmount(() => {
                   Main Services
                 </span>
 
-                <!-- :aria-expanded e :aria-label passano valori dinamici per l'accessibilita. -->
-                <!-- .stop ferma la propagazione del click, cosi non scatta anche il click del contenitore padre. -->
                 <button
                   type="button"
                   :aria-expanded="isExpanded"
@@ -446,9 +425,7 @@ onBeforeUnmount(() => {
                   :class="isExpanded ? 'text-gray-400' : 'text-blue-500'"
                   @click.stop="toggleExpand"
                 >
-
                   <div class="relative w-7 h-7">
-                    <!-- Prima icona: freccia visibile quando il menu e chiuso. -->
                     <svg
                       :class="isExpanded ? 'opacity-0 scale-50 rotate-90' : 'opacity-100 scale-100 rotate-0'"
                       class="absolute inset-0 w-7 h-7 transition-all duration-500"
@@ -458,7 +435,6 @@ onBeforeUnmount(() => {
                     >
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
                     </svg>
-                    <!-- Seconda icona: X visibile quando il menu e aperto. -->
                     <svg
                       :class="isExpanded ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-50 -rotate-90'"
                       class="absolute inset-0 w-7 h-7 transition-all duration-500"
@@ -472,19 +448,11 @@ onBeforeUnmount(() => {
                 </button>
               </div>
 
-              <!-- Quando e espanso occupa lo spazio disponibile; quando e chiuso resta semplice. -->
               <div
                 class="transition-all duration-[800ms] flex flex-col w-full"
                 :class="isExpanded ? 'flex-1 justify-start max-w-3xl mx-auto' : 'justify-start'"
               >
-                <!-- :style permette di scrivere stili inline dinamici come oggetto JavaScript. -->
                 <div class="relative w-full" :style="{ height: isExpanded ? '190px' : '56px' }">
-                  <!-- v-for ripete questo bottone per ogni elemento dentro buttons. -->
-                  <!-- button e l'oggetto corrente, index e la posizione nell'array: 0, 1, 2... -->
-                  <!-- :key aiuta Vue a riconoscere ogni elemento quando la lista cambia. -->
-                  <!-- :style calcola posizione, dimensioni e ritardi dell'animazione. -->
-                  <!-- :class usa template literal per aggiungere classi salvate nell'oggetto button. -->
-                  <!-- @click.stop passa alla funzione l'intero oggetto button. -->
                   <button
                     v-for="(button, index) in buttons"
                     :key="button.id"
@@ -504,8 +472,6 @@ onBeforeUnmount(() => {
                       : `${button.colorCollapsed} shadow-sm`"
                     @click.stop="goToPage(button)"
                   >
-                    <!-- Icona piccola, visibile soprattutto quando il menu e chiuso. -->
-                    <!-- :d collega il path SVG al valore button.iconPath. -->
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       class="absolute transition-all duration-[500ms] w-7 h-7"
@@ -519,7 +485,6 @@ onBeforeUnmount(() => {
                       <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
                     </svg>
 
-                    <!-- Contenuto testuale del bottone, visibile quando il menu e espanso. -->
                     <div
                       class="flex items-center space-x-4 transition-all duration-[500ms]"
                       :style="{ transitionDelay: isExpanded ? `${index * 120 + 400}ms` : '0ms' }"
@@ -535,14 +500,12 @@ onBeforeUnmount(() => {
                       >
                         <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
                       </svg>
-                      <!-- Le doppie graffe {{ }} stampano nel template un valore JavaScript. -->
                       <span class="font-bold text-xl sm:text-2xl tracking-tight">{{ button.text }}</span>
                     </div>
                   </button>
                 </div>
               </div>
 
-              <!-- Testo visibile solo quando il menu e chiuso. pointer-events-none evita click su elemento nascosto. -->
               <p
                 class="transition-all duration-300 text-sm font-medium text-gray-400 absolute bottom-6 left-6"
                 :class="isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100 delay-500'"
@@ -550,7 +513,6 @@ onBeforeUnmount(() => {
                 Tocca per esplorare
               </p>
 
-              <!-- Footer del menu: appare solo nello stato espanso. -->
               <div
                 class="transition-all duration-[800ms] text-center text-gray-300 pb-8"
                 :class="isExpanded ? 'opacity-100 delay-[800ms]' : 'opacity-0 absolute bottom-0 pointer-events-none w-full left-0'"
@@ -562,7 +524,6 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <!-- Schermata interna che appare quando l'utente clicca il bottone con id 1. -->
       <section
         v-if="showClassroomNavigation"
         id="classroom-navigation-panel"
@@ -593,11 +554,9 @@ onBeforeUnmount(() => {
               <span>System response</span>
               <strong>TODO</strong>
             </div>
-
             <p v-if="classroomLastQuestion" class="classroom-last-question">
               Asked: {{ classroomLastQuestion }}
             </p>
-
             <p>{{ classroomSystemResponse }}</p>
           </div>
 
@@ -605,8 +564,6 @@ onBeforeUnmount(() => {
             <p class="classroom-console-copy">
               Enable the microphone, say the classroom name, or type the destination manually.
             </p>
-
-            <!-- @submit.prevent evita il refresh pagina quando premi Enter o il bottone Ask. -->
             <form class="classroom-command-bar" @submit.prevent="submitClassroomQuestion">
               <button
                 type="button"
@@ -617,23 +574,17 @@ onBeforeUnmount(() => {
                 @click="toggleClassroomMicrophone"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z"
-                  />
+                  <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
                 </svg>
               </button>
-
-              <!-- v-model collega la textbar a classroomPrompt. -->
               <input
                 v-model="classroomPrompt"
                 type="text"
                 class="classroom-command-input"
                 placeholder="Tell classroom name or ask for a route..."
               >
-
               <button type="submit" class="classroom-ask-button">Ask</button>
             </form>
-
             <p class="classroom-voice-status" aria-live="polite">
               {{ classroomVoiceStatus }}
             </p>
@@ -641,58 +592,42 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <!-- Sezione chatbot. aria-labelledby collega la section al titolo h2 con id campus-ai-title. -->
-      <section class="chatbot-section" aria-labelledby="campus-ai-title">
-        <div class="chatbot-copy">
-          <p class="eyebrow">New</p>
-          <div class="chatbot-heading">
-            <h2 id="campus-ai-title">Campus AI Assistant</h2>
-            <span class="chatbot-badge">Draft experience</span>
-          </div>
-          <p class="chatbot-description">
-            A first chatbot concept for asking questions about the campus, services,
-            offices, directions, and student support.
-          </p>
-
-          <!-- Lista dei suggerimenti: ogni prompt genera un bottone. -->
-          <!-- Quando clicchi il suggerimento, passa la stringa prompt alla funzione. -->
-          <div class="prompt-list" aria-label="Suggested prompts">
-            <button
-              v-for="prompt in starterPrompts"
-              :key="prompt"
-              type="button"
-              class="prompt-chip"
-              @click="useStarterPrompt(prompt)"
-            >
-              {{ prompt }}
-            </button>
-          </div>
-        </div>
-
+      <!-- Sezione chatbot. Visibile solo se la navigazione aule e chiusa. -->
+      <section v-else class="chatbot-section" aria-labelledby="campus-ai-title">
         <div class="chatbot-card">
-          <!-- aria-live="polite" fa annunciare i nuovi messaggi agli screen reader senza interrompere bruscamente. -->
           <div class="chatbot-window" aria-live="polite">
-            <!-- v-for scorre tutti i messaggi della chat. -->
-            <!-- :key usa una chiave composta con role e index usando template literal. -->
-            <!-- :class diventa message-row--assistant oppure message-row--user. -->
             <div
               v-for="(message, index) in chatMessages"
               :key="`${message.role}-${index}`"
               class="message-row"
               :class="`message-row--${message.role}`"
             >
-              <!-- Anche la bolla cambia classe in base al role del messaggio. -->
               <div class="message-bubble" :class="`message-bubble--${message.role}`">
                 {{ message.text }}
               </div>
             </div>
           </div>
 
-          <!-- @submit.prevent intercetta il submit del form e impedisce il refresh della pagina. -->
+          <div class="ai-assistant-block">
+            <div class="chatbot-heading">
+              <h2 id="campus-ai-title">Campus AI Assistant</h2>
+            </div>
+
+            <div class="prompt-list" aria-label="Suggested prompts">
+              <button
+                v-for="prompt in starterPrompts"
+                :key="prompt"
+                type="button"
+                class="prompt-chip"
+                @click="useStarterPrompt(prompt)"
+              >
+                {{ prompt }}
+              </button>
+            </div>
+          </div>
+
           <form class="chatbot-form" @submit.prevent="submitChat">
-            <!-- Label visivamente nascosta ma utile per accessibilita. -->
             <label class="sr-only" for="campus-ai-input">Ask the campus assistant</label>
-            <!-- v-model collega input e variabile: quando scrivi cambia userPrompt, e viceversa. -->
             <input
               id="campus-ai-input"
               v-model="userPrompt"
@@ -700,7 +635,6 @@ onBeforeUnmount(() => {
               class="chatbot-input"
               placeholder="Ask something about the campus..."
             >
-            <!-- type="submit" invia il form e quindi attiva @submit.prevent sopra. -->
             <button type="submit" class="chatbot-send">Send</button>
           </form>
         </div>
@@ -710,49 +644,37 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* <style scoped> applica questi CSS solo a questo componente, aggiungendo attributi interni generati da Vue. */
-/* :global(...) serve quando vogliamo comunque modificare elementi globali come body o a. */
 :global(body) {
-  /* Toglie il margine predefinito del browser. */
   margin: 0;
-  /* Imposta il font di base della pagina. */
   font-family: "Segoe UI", sans-serif;
-  /* background puo contenere piu livelli: qui un radial-gradient sopra un linear-gradient. */
   background:
     radial-gradient(circle at top left, rgba(255, 200, 87, 0.24), transparent 30%),
     linear-gradient(180deg, #fff8ef 0%, #f4efe8 100%);
-  /* Colore testo predefinito. */
   color: #1f2937;
+  overflow: hidden; /* prevents body scroll */
 }
 
-/* Stile globale dei link: ereditano il colore del testo e non hanno sottolineatura. */
 :global(a) {
   color: inherit;
   text-decoration: none;
 }
 
-/* Contenitore principale della pagina. */
 .home-shell {
-  /* Variabili CSS: si usano con var(--nome-variabile). */
   --panel-bg: rgba(255, 255, 255, 0.78);
   --panel-border: rgba(148, 163, 184, 0.22);
   --primary: #d97706;
   --primary-dark: #9a3412;
   --shadow: 0 28px 60px rgba(120, 53, 15, 0.16);
-  /* min-height: 100vh rende il contenitore alto almeno quanto tutta la finestra. */
-  min-height: 100vh;
-  /* position: relative permette ai figli position:absolute di posizionarsi rispetto a questo box. */
+  height: 100vh;
   position: relative;
-  /* Nasconde cio che esce dai bordi del contenitore. */
   overflow: hidden;
-  /* Grid usata qui solo per centrare il contenuto. */
-  display: grid;
-  /* Scorciatoia per align-items + justify-items al centro. */
-  place-items: center;
-  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
 }
 
-/* Forma decorativa sfocata usata come sfondo. */
 .background-orb {
   position: absolute;
   border-radius: 999px;
@@ -760,7 +682,6 @@ onBeforeUnmount(() => {
   opacity: 0.8;
 }
 
-/* Posizione e dimensione della forma decorativa sinistra. */
 .orb-left {
   width: 240px;
   height: 240px;
@@ -769,7 +690,6 @@ onBeforeUnmount(() => {
   left: -80px;
 }
 
-/* Posizione e dimensione della forma decorativa destra. */
 .orb-right {
   width: 320px;
   height: 320px;
@@ -778,16 +698,18 @@ onBeforeUnmount(() => {
   right: -80px;
 }
 
-/* Pannello che limita la larghezza del contenuto centrale. */
 .home-panel {
-  /* min(760px, 100%) sceglie il valore piu piccolo: massimo 760px, ma mai piu largo dello schermo. */
   width: min(760px, 100%);
+  height: 100%;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   position: relative;
-  /* z-index lo mette sopra le forme decorative. */
   z-index: 1;
+  gap: 12px; /* reduced gap to fit elements tightly */
 }
 
-/* Link/icona login in alto a destra. */
 .login-link {
   position: absolute;
   top: 20px;
@@ -804,62 +726,55 @@ onBeforeUnmount(() => {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* :hover si applica quando il mouse e sopra l'elemento. */
 .login-link:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
 }
 
-/* Stile dell'SVG dentro il link login. */
 .login-link svg {
   width: 24px;
   height: 24px;
   fill: var(--primary-dark);
 }
 
-/* Card superiore con titolo e pulsanti. */
 .hero-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 28px;
-  padding: 34px;
+  padding: 16px; /* reduced padding */
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
   text-align: center;
+  flex-shrink: 0;
 }
 
-/* Piccola etichetta sopra i titoli. */
 .eyebrow {
-  margin: 0 0 10px;
+  margin: 0 0 6px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #b45309;
 }
 
-/* Titolo principale dentro .hero-card. */
 .hero-card h1 {
   margin: 0;
-  /* clamp(min, ideale, max) rende il font responsive entro limiti. */
-  font-size: clamp(2rem, 4vw, 3.3rem);
+  font-size: clamp(1.4rem, 2.5vw, 2.2rem); /* reduced size */
   line-height: 1.05;
 }
 
-/* Testo descrittivo sotto il titolo. */
 .hero-copy {
   max-width: 520px;
-  margin: 14px auto 26px;
-  font-size: 1rem;
-  line-height: 1.65;
+  margin: 10px auto 14px;
+  font-size: 0.9rem; /* reduced size */
+  line-height: 1.5;
   color: #475569;
 }
 
-/* Pulsanti della hero. */
 .hero-button {
   border: 0;
   border-radius: 999px;
-  padding: 14px 28px;
-  font-size: 1rem;
+  padding: 10px 20px; /* reduced padding */
+  font-size: 0.9rem;
   font-weight: 700;
   color: #fff;
   background: linear-gradient(135deg, var(--primary), #f97316);
@@ -868,53 +783,54 @@ onBeforeUnmount(() => {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Effetto hover dei pulsanti hero. */
 .hero-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 20px 34px rgba(217, 119, 6, 0.35);
 }
 
-/* Contenitore dei pulsanti: flex li affianca e flex-wrap li manda a capo se manca spazio. */
 .hero-actions {
   display: flex;
   justify-content: center;
-  gap: 18px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
-/* Pannello classroom navigation mostrato nella stessa pagina. */
+.services-menu-section {
+  flex-shrink: 0;
+}
+
 .classroom-navigation {
-  margin-top: 30px;
-  padding: 28px;
+  padding: 16px;
   border: 1px solid rgba(59, 130, 246, 0.18);
   border-radius: 8px;
   background:
     linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.88));
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(18px);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-/* Testata del pannello con titolo e bottone chiusura. */
 .classroom-navigation-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 12px;
 }
 
-/* Titolo principale della classroom navigation. */
 .classroom-navigation h2 {
   margin: 0;
-  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
   line-height: 1.1;
   color: #1e3a8a;
 }
 
-/* Bottone per chiudere la schermata classroom navigation. */
 .classroom-close {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(59, 130, 246, 0.24);
@@ -924,53 +840,49 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-/* Icona X dentro il bottone di chiusura. */
 .classroom-close svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-width: 2.5;
 }
 
-/* Console interna del pannello. */
 .classroom-console {
   min-width: 0;
-  min-height: 430px;
-  padding: 18px;
+  flex: 1;
+  padding: 14px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.82);
   display: grid;
-  grid-template-rows: minmax(260px, 1fr) auto;
-  gap: 16px;
+  grid-template-rows: minmax(100px, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
 }
 
-/* Area in basso che contiene testo introduttivo, input, microfono e stato. */
 .classroom-input-area {
   align-self: end;
 }
 
-/* Testo introduttivo della console vocale/testuale. */
 .classroom-console-copy {
-  margin: 0 0 16px;
+  margin: 0 0 10px;
   color: #475569;
-  line-height: 1.6;
+  line-height: 1.4;
+  font-size: 0.85rem;
 }
 
-/* Barra di comando: microfono, input e invio. */
 .classroom-command-bar {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: stretch;
 }
 
-/* Bottone microfono. */
 .classroom-mic-button {
-  width: 48px;
-  min-height: 48px;
+  width: 42px;
+  min-height: 42px;
   display: grid;
   place-items: center;
   border: 0;
@@ -980,281 +892,236 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-/* Stato attivo del microfono. */
 .classroom-mic-button--active {
   background: #dc2626;
 }
 
-/* Icona microfono. */
 .classroom-mic-button svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   fill: currentColor;
 }
 
-/* Textbar per scrivere o ricevere la trascrizione vocale. */
 .classroom-command-input {
   min-width: 0;
   width: 100%;
   border: 1px solid rgba(59, 130, 246, 0.24);
   border-radius: 8px;
-  padding: 0 14px;
+  padding: 0 12px;
   font: inherit;
+  font-size: 0.9rem;
   color: #1f2937;
   background: rgba(255, 255, 255, 0.96);
 }
 
-/* Focus della textbar. */
 .classroom-command-input:focus {
   outline: 2px solid rgba(37, 99, 235, 0.18);
   border-color: rgba(37, 99, 235, 0.55);
 }
 
-/* Bottone Ask della classroom navigation. */
 .classroom-ask-button {
-  min-height: 48px;
+  min-height: 42px;
   border: 0;
   border-radius: 8px;
-  padding: 0 18px;
+  padding: 0 14px;
   font: inherit;
+  font-size: 0.9rem;
   font-weight: 800;
   color: #fff;
   background: #0f766e;
   cursor: pointer;
 }
 
-/* Riga di stato del microfono. */
 .classroom-voice-status {
-  min-height: 22px;
-  margin: 10px 0 0;
+  min-height: 18px;
+  margin: 8px 0 0;
   color: #475569;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
 }
 
-/* Area dove finira la risposta del sistema. */
 .classroom-response {
-  min-height: 260px;
-  padding: 16px;
+  padding: 12px;
   border: 1px solid rgba(15, 118, 110, 0.18);
   border-radius: 8px;
   background: rgba(240, 253, 250, 0.72);
   color: #134e4a;
-  line-height: 1.6;
+  line-height: 1.5;
   overflow: auto;
+  font-size: 0.85rem;
 }
 
-/* Intestazione dell'area risposta. */
 .classroom-response-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: #0f766e;
   font-weight: 800;
 }
 
-/* Badge TODO nella risposta. */
 .classroom-response-header strong {
   padding: 4px 8px;
   border-radius: 8px;
   background: rgba(15, 118, 110, 0.12);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
-/* Ultima domanda inviata. */
 .classroom-last-question {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: #0f766e;
   font-weight: 700;
 }
 
-/* Paragrafi dentro la risposta. */
 .classroom-response p {
   margin: 0;
 }
 
-/* Layout della sezione chatbot: due colonne su schermi grandi. */
 .chatbot-section {
-  margin-top: 30px;
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 20px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* take remaining vertical space */
+  min-height: 0; /* needed for flex children to shrink */
 }
 
-/* Regole condivise da due blocchi: la virgola applica gli stessi stili a entrambi i selettori. */
-.chatbot-copy,
 .chatbot-card {
   border-radius: 28px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(255, 255, 255, 0.8);
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(18px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  gap: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 235, 0.95) 0%, rgba(255, 255, 255, 0.82) 100%);
 }
 
-/* Colonna testuale del chatbot. */
-.chatbot-copy {
-  padding: 28px;
+.ai-assistant-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-/* Header del chatbot con titolo e badge affiancati. */
 .chatbot-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
-/* Titolo h2 dentro l'header del chatbot. */
 .chatbot-heading h2 {
   margin: 0;
-  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-size: clamp(1.1rem, 2vw, 1.4rem); /* reduced size */
   color: #7c2d12;
 }
 
-/* Badge piccolo accanto al titolo. */
-.chatbot-badge {
-  white-space: nowrap;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(255, 237, 213, 0.95);
-  color: #9a3412;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-/* Paragrafo descrittivo del chatbot. */
-.chatbot-description {
-  margin: 0;
-  color: #475569;
-  line-height: 1.7;
-}
-
-/* Lista dei suggerimenti: flex con elementi che possono andare a capo. */
 .prompt-list {
-  margin-top: 22px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px; /* reduced */
 }
 
-/* Singolo chip/suggerimento cliccabile. */
 .prompt-chip {
   border: 0;
   border-radius: 999px;
-  padding: 12px 14px;
+  padding: 8px 12px; /* reduced */
   background: linear-gradient(135deg, rgba(255, 237, 213, 0.95), rgba(254, 215, 170, 0.9));
   color: #9a3412;
+  font-size: 0.8rem; /* reduced */
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Effetto hover sui suggerimenti. */
 .prompt-chip:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 22px rgba(217, 119, 6, 0.18);
 }
 
-/* Card che contiene finestra messaggi e form. */
-.chatbot-card {
-  padding: 18px;
-  display: grid;
-  gap: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 251, 235, 0.95) 0%, rgba(255, 255, 255, 0.82) 100%);
-}
-
-/* Area scrollabile dei messaggi. */
 .chatbot-window {
-  min-height: 300px;
-  max-height: 360px;
-  overflow: auto;
-  padding: 12px;
+  min-height: 0; /* allows shrinking */
+  flex: 1; /* takes all space possible */
+  overflow-y: auto;
+  padding: 10px; /* reduced */
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(251, 191, 36, 0.22);
   display: grid;
-  gap: 12px;
+  align-content: start; /* align messages to top */
+  gap: 10px; /* reduced */
 }
 
-/* Riga generica di un messaggio. */
 .message-row {
   display: flex;
 }
 
-/* I messaggi assistant vengono allineati a sinistra. */
 .message-row--assistant {
   justify-content: flex-start;
 }
 
-/* I messaggi user vengono allineati a destra. */
 .message-row--user {
   justify-content: flex-end;
 }
 
-/* Stile comune delle bolle messaggio. */
 .message-bubble {
   max-width: min(90%, 380px);
-  padding: 14px 16px;
+  padding: 10px 14px; /* reduced */
   border-radius: 18px;
-  line-height: 1.55;
-  font-size: 0.96rem;
+  line-height: 1.4;
+  font-size: 0.85rem; /* reduced */
 }
 
-/* Bolla dell'assistente. */
 .message-bubble--assistant {
   background: #fff7ed;
   color: #7c2d12;
   border-top-left-radius: 6px;
 }
 
-/* Bolla dell'utente. */
 .message-bubble--user {
   background: linear-gradient(135deg, var(--primary), #f97316);
   color: #fff;
   border-top-right-radius: 6px;
 }
 
-/* Form della chat: input largo e pulsante a destra. */
 .chatbot-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px; /* reduced */
+  flex-shrink: 0;
 }
 
-/* Campo di testo della chat. */
 .chatbot-input {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 18px;
-  padding: 14px 16px;
+  padding: 12px 14px; /* reduced */
   font: inherit;
+  font-size: 0.85rem;
   color: #1f2937;
   background: rgba(255, 255, 255, 0.92);
 }
 
-/* :focus si applica quando l'input e selezionato per scrivere. */
 .chatbot-input:focus {
   outline: 2px solid rgba(217, 119, 6, 0.2);
   border-color: rgba(217, 119, 6, 0.45);
 }
 
-/* Pulsante invio della chat. */
 .chatbot-send {
   border: 0;
   border-radius: 18px;
-  padding: 0 20px;
+  padding: 0 16px; /* reduced */
   font: inherit;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #fff;
   background: linear-gradient(135deg, #c2410c, #f97316);
   cursor: pointer;
 }
 
-/* Classe standard per testo visibile agli screen reader ma nascosto graficamente. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1267,69 +1134,55 @@ onBeforeUnmount(() => {
   border: 0;
 }
 
-/* Media query: queste regole valgono solo quando la larghezza dello schermo e al massimo 640px. */
 @media (max-width: 640px) {
-  /* Su mobile aumenta il padding superiore per lasciare spazio al login in alto. */
   .home-shell {
-    padding: 88px 16px 28px;
+    padding: 76px 12px 12px; /* keep top space for login, reduce lateral */
   }
 
-  /* Riduce il padding della card principale su mobile. */
+  .home-panel {
+    gap: 10px;
+  }
+
   .hero-card {
-    padding: 26px 20px;
+    padding: 14px 16px;
   }
 
-  /* Avvicina leggermente i pulsanti su mobile. */
   .hero-actions {
-    gap: 14px;
+    gap: 10px;
   }
 
-  /* Il chatbot passa da due colonne a una sola colonna. */
-  .chatbot-section {
-    grid-template-columns: 1fr;
-  }
-
-  /* Il pannello classroom navigation occupa meno spazio laterale su mobile. */
   .classroom-navigation {
-    padding: 20px;
+    padding: 14px;
   }
 
-  /* Titolo e bottone chiusura restano leggibili su schermi stretti. */
   .classroom-navigation-header {
     align-items: flex-start;
   }
 
-  /* La barra comando su mobile mette il bottone Ask sotto input e microfono. */
   .classroom-command-bar {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr);
   }
 
-  /* Ask prende tutta la larghezza della seconda riga. */
   .classroom-ask-button {
     grid-column: 1 / -1;
   }
 
-  /* Riduce il padding laterale delle card chatbot. */
-  .chatbot-copy,
   .chatbot-card {
-    padding-left: 20px;
-    padding-right: 20px;
+    padding-left: 14px;
+    padding-right: 14px;
   }
 
-  /* Titolo e badge del chatbot vanno uno sotto l'altro. */
   .chatbot-heading {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  /* Il form passa da input+pulsante affiancati a una sola colonna. */
   .chatbot-form {
     grid-template-columns: 1fr;
   }
 
-  /* Altezza minima comoda per tocco su mobile. */
   .chatbot-send {
-    min-height: 48px;
+    min-height: 42px;
   }
 }
 </style>
