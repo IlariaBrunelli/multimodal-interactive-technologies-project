@@ -159,7 +159,14 @@ function onSheetPointerDown(e: PointerEvent) {
     ev.preventDefault()
     const deltaY = ev.clientY - dragStartY
     let newY = currentDragY + deltaY
-    if (newY > 0) newY = 0 // Limita verso il basso
+    
+    if (!isArMode.value) {
+      if (newY > 0) newY = 0 // Limita verso il basso in normal mode
+    } else {
+      const maxDown = window.innerHeight - 200
+      if (newY > maxDown) newY = maxDown // Allow dragging down in AR mode
+    }
+    
     sheetDragY.value = newY
   }
 
@@ -170,10 +177,20 @@ function onSheetPointerDown(e: PointerEvent) {
     window.removeEventListener('pointerup', handleUp)
     
     // Snap automatico
-    if (sheetDragY.value < -100) {
-      sheetDragY.value = -maxDragDistance
+    if (isArMode.value) {
+      if (sheetDragY.value > 100) {
+        sheetDragY.value = window.innerHeight - 200 // Snap to hidden at bottom
+      } else if (sheetDragY.value < -100) {
+        sheetDragY.value = -maxDragDistance // Snap to full height
+      } else {
+        sheetDragY.value = 0 // Snap to default
+      }
     } else {
-      sheetDragY.value = 0
+      if (sheetDragY.value < -100) {
+        sheetDragY.value = -maxDragDistance
+      } else {
+        sheetDragY.value = 0
+      }
     }
   }
 
@@ -348,15 +365,33 @@ function toggleMicrophone() {
 async function startCamera() {
   if (!import.meta.client) return
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    })
+    const constraints = { video: { facingMode: 'environment' } }
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      cameraStream = await navigator.mediaDevices.getUserMedia(constraints)
+    } else {
+      const getMedia = (navigator as any).getUserMedia ||
+                       (navigator as any).webkitGetUserMedia ||
+                       (navigator as any).mozGetUserMedia ||
+                       (navigator as any).msGetUserMedia
+                       
+      if (!getMedia) {
+        throw new Error('Camera not supported by your browser. Ensure you are using HTTPS.')
+      }
+      
+      cameraStream = await new Promise((resolve, reject) => {
+        getMedia.call(navigator, constraints, resolve, reject)
+      }) as MediaStream
+    }
+
     if (videoElement.value) {
       videoElement.value.srcObject = cameraStream
+      // Some mobile browsers need explicit play
+      videoElement.value.play().catch(e => console.warn('Auto-play prevented:', e))
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Camera access error:', error)
-    alert('Access to the camera was denied or is not supported on this device.')
+    alert(`Camera error: ${error.message || 'Access to the camera was denied or is not supported on this device.'}`)
     isArMode.value = false
   }
 }
@@ -451,7 +486,7 @@ onBeforeUnmount(() => {
 
     <section class="home-panel">
       <!-- Card principale della pagina. -->
-      <div class="hero-card">
+      <div class="hero-card transition-all duration-500" :class="isArMode ? '!bg-transparent !border-transparent !shadow-none !backdrop-blur-none !p-0 !m-0 pointer-events-none' : ''">
         <div 
           class="transition-all duration-300"
           :class="[
@@ -474,7 +509,7 @@ onBeforeUnmount(() => {
         
         <div 
           class="hero-actions transition-all duration-700 ease-[cubic-bezier(0.34,1.1,0.64,1)]"
-          :class="isArMode ? 'fixed top-6 left-6 z-50 flex-col items-start gap-4' : 'relative flex-row justify-center gap-[14px]'"
+          :class="isArMode ? 'fixed top-6 left-6 z-50 flex-row items-center gap-4' : 'relative flex-row justify-center gap-[14px]'"
         >
           <button type="button" class="hero-button" @click="toggleArMode" :class="{ 'ar-button-active': isArMode }">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -626,7 +661,8 @@ onBeforeUnmount(() => {
       <section class="chatbot-section" aria-label="Campus AI Assistant">
         <div 
           class="chatbot-card"
-          :class="{ 'chatbot-card--dragging': isSheetDragging, 'transition-shadow duration-300': !isSheetDragging }"
+          :class="{ 'chatbot-card--dragging': isSheetDragging, 'transition-all duration-300': !isSheetDragging }"
+          :style="{ transform: (isArMode && sheetDragY > 0) ? `translateY(${sheetDragY}px)` : 'translateY(0px)' }"
         >
           <div class="drag-handle" @pointerdown="onSheetPointerDown">
             <div class="drag-bar"></div>
@@ -675,7 +711,8 @@ onBeforeUnmount(() => {
             </button>
             <input
               id="campus-ai-input"
-              v-model="userPrompt"
+              :value="userPrompt"
+              @input="userPrompt = $event.target.value"
               type="text"
               class="chatbot-input"
               placeholder="Ask something about the campus..."
@@ -694,9 +731,16 @@ onBeforeUnmount(() => {
   </main>
 </template>
 
+
 <style scoped>
+:global(html) {
+  height: 100%;
+  overflow: hidden; /* signals to the browser this page does not scroll */
+}
+
 :global(body) {
   margin: 0;
+  height: 100%;
   font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
   background:
     radial-gradient(circle at top left, rgba(16, 44, 83, 0.15), transparent 30%),
@@ -704,6 +748,7 @@ onBeforeUnmount(() => {
   color: #000000;
   overflow: hidden; /* prevents body scroll */
 }
+
 
 :global(a) {
   color: inherit;
@@ -716,7 +761,7 @@ onBeforeUnmount(() => {
   --primary: #102C53;
   --primary-dark: #000000;
   --shadow: 0 28px 60px rgba(16, 44, 83, 0.16);
-  height: 100vh;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
   display: flex;
