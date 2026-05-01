@@ -42,6 +42,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    n8nCampusChatWebhook: process.env.N8N_CAMPUS_CHAT_WEBHOOK || '',
     public: {
       supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || '',
       supabaseAnonKey:

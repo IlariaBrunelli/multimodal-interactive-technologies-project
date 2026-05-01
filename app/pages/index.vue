@@ -26,6 +26,11 @@ type ChatMessage = {
   text: string
 }
 
+type CampusChatResponse = {
+  reply: string
+  sessionId: string
+}
+
 // Tipo minimo per usare la Web Speech API senza importare librerie esterne.
 type BrowserSpeechRecognitionResult = {
   readonly [index: number]: { transcript: string } | undefined
@@ -121,8 +126,14 @@ const chatMessages = ref<ChatMessage[]>([
 // Testo scritto dall'utente nell'input della chat.
 const userPrompt = ref('')
 
-// Riferimento all'oggetto SpeechRecognition, cosi possiamo fermarlo quando serve.
-let speechRecognition: BrowserSpeechRecognition | null = null
+// Stato di caricamento della chat mentre aspettiamo la risposta dell'agente n8n.
+const isChatLoading = ref(false)
+
+// Chiave usata per mantenere la stessa sessione n8n nello stesso browser.
+const campusChatSessionStorageKey = 'campus-ai-assistant-session-id'
+
+// Controlla se il pannello classroom navigation e visibile nella stessa pagina.
+const showClassroomNavigation = ref(false)
 
 // Stato vero se il microfono sta attivamente registrando
 const isListening = ref(false)
@@ -361,49 +372,31 @@ function toggleMicrophone() {
   }
 }
 
-// === Gestione Videocamera (AR Mode) ===
-async function startCamera() {
-  if (!import.meta.client) return
-  try {
-    const constraints = { video: { facingMode: 'environment' } }
-    
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      cameraStream = await navigator.mediaDevices.getUserMedia(constraints)
-    } else {
-      const getMedia = (navigator as any).getUserMedia ||
-                       (navigator as any).webkitGetUserMedia ||
-                       (navigator as any).mozGetUserMedia ||
-                       (navigator as any).msGetUserMedia
-                       
-      if (!getMedia) {
-        throw new Error('Camera not supported by your browser. Ensure you are using HTTPS.')
-      }
-      
-      cameraStream = await new Promise((resolve, reject) => {
-        getMedia.call(navigator, constraints, resolve, reject)
-      }) as MediaStream
-    }
+function createCampusChatSessionId() {
+  const browserCrypto = import.meta.client
+    ? window.crypto as (Crypto & { randomUUID?: () => string }) | undefined
+    : undefined
 
-    if (videoElement.value) {
-      videoElement.value.srcObject = cameraStream
-      // Some mobile browsers need explicit play
-      videoElement.value.play().catch(e => console.warn('Auto-play prevented:', e))
-    }
-  } catch (error: any) {
-    console.error('Camera access error:', error)
-    alert(`Camera error: ${error.message || 'Access to the camera was denied or is not supported on this device.'}`)
-    isArMode.value = false
+  return browserCrypto?.randomUUID?.() ?? `campus-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+// Restituisce una sessione stabile per permettere a n8n di usare la memoria della conversazione.
+function getCampusChatSessionId() {
+  if (!import.meta.client) {
+    return createCampusChatSessionId()
   }
 }
 
-function stopCamera() {
-  if (cameraStream) {
-    cameraStream.getTracks().forEach(track => track.stop())
-    cameraStream = null
+  const existingSessionId = window.localStorage.getItem(campusChatSessionStorageKey)
+
+  if (existingSessionId) {
+    return existingSessionId
   }
-  if (videoElement.value) {
-    videoElement.value.srcObject = null
-  }
+
+  const sessionId = createCampusChatSessionId()
+  window.localStorage.setItem(campusChatSessionStorageKey, sessionId)
+
+  return sessionId
 }
 
 function toggleArMode() {
@@ -416,16 +409,16 @@ function toggleArMode() {
 }
 
 // Questa funzione gestisce l'invio del form della chat.
-function submitChat() {
-  if (isListening.value) stopMicrophone()
-
+async function submitChat() {
   // trim rimuove spazi vuoti all'inizio e alla fine.
   const question = userPrompt.value.trim()
 
   // Se dopo trim non rimane testo, usciamo dalla funzione.
-  if (!question) {
+  if (!question || isChatLoading.value) {
     return
   }
+
+  isChatLoading.value = true
 
   // push aggiunge un nuovo messaggio dell'utente alla lista reattiva.
   chatMessages.value.push({
@@ -433,14 +426,44 @@ function submitChat() {
     text: question
   })
 
-  // Aggiunge subito anche la risposta dell'assistente.
-  chatMessages.value.push({
+  // Aggiunge un messaggio temporaneo mentre la route server interroga n8n.
+  const assistantMessageIndex = chatMessages.value.push({
     role: 'assistant',
-    text: answerCampusQuestion(question)
-  })
+    text: 'Sto elaborando la tua richiesta...'
+  }) - 1
 
   // Svuota l'input dopo l'invio.
   userPrompt.value = ''
+
+  try {
+    // Recupera il token di sessione di Supabase (JWT)
+    const supabase = useSupabaseClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+
+    const response = await $fetch<CampusChatResponse>('/api/campus-chat', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      timeout: 600000, // 10 minutes timeout for slow local LLM responses
+      body: {
+        message: question,
+        sessionId: getCampusChatSessionId()
+      }
+    })
+
+    chatMessages.value[assistantMessageIndex] = {
+      role: 'assistant',
+      text: response.reply
+    }
+  } catch (error: any) {
+    const errorMsg = error.data?.statusMessage || error.message || 'Errore sconosciuto'
+    chatMessages.value[assistantMessageIndex] = {
+      role: 'assistant',
+      text: `Non riesco a contattare l'agente in questo momento. (${errorMsg})`
+    }
+  } finally {
+    isChatLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -679,6 +702,86 @@ onBeforeUnmount(() => {
               'mask-bottom': chatScrollState.bottom && !chatScrollState.top
             }"
           >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="classroom-console">
+          <div class="classroom-response">
+            <div class="classroom-response-header">
+              <span>System response</span>
+              <strong>TODO</strong>
+            </div>
+            <p v-if="classroomLastQuestion" class="classroom-last-question">
+              Asked: {{ classroomLastQuestion }}
+            </p>
+            <p>{{ classroomSystemResponse }}</p>
+          </div>
+
+          <div class="classroom-input-area">
+            <p class="classroom-console-copy">
+              Enable the microphone, say the classroom name, or type the destination manually.
+            </p>
+            <form class="classroom-command-bar" @submit.prevent="submitClassroomQuestion">
+              <button
+                type="button"
+                class="classroom-mic-button"
+                :class="{ 'classroom-mic-button--active': isClassroomListening }"
+                :aria-pressed="isClassroomListening"
+                :aria-label="isClassroomListening ? 'Stop microphone' : 'Enable microphone'"
+                @click="toggleClassroomMicrophone"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
+                </svg>
+              </button>
+              <input
+                v-model="classroomPrompt"
+                type="text"
+                class="classroom-command-input"
+                placeholder="Tell classroom name or ask for a route..."
+              >
+              <button type="submit" class="classroom-ask-button">Ask</button>
+            </form>
+            <p class="classroom-voice-status" aria-live="polite">
+              {{ classroomVoiceStatus }}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sezione chatbot. aria-labelledby collega la section al titolo h2 con id campus-ai-title. -->
+      <section class="chatbot-section" aria-labelledby="campus-ai-title">
+        <div class="chatbot-copy">
+          <p class="eyebrow">New</p>
+          <div class="chatbot-heading">
+            <h2 id="campus-ai-title">Campus AI Assistant</h2>
+            <span class="chatbot-badge">Calendario lezioni</span>
+          </div>
+          <p class="chatbot-description">
+            Chiedi informazioni sulle lezioni, sugli orari e sui prossimi impegni
+            salvati nel calendario.
+          </p>
+
+          <!-- Lista dei suggerimenti: ogni prompt genera un bottone. -->
+          <!-- Quando clicchi il suggerimento, passa la stringa prompt alla funzione. -->
+          <div class="prompt-list" aria-label="Suggested prompts">
+            <button
+              v-for="prompt in starterPrompts"
+              :key="prompt"
+              type="button"
+              class="prompt-chip"
+              @click="useStarterPrompt(prompt)"
+            >
+              {{ prompt }}
+            </button>
+          </div>
+        </div>
+
+        <div class="chatbot-card">
+          <div class="chatbot-window" aria-live="polite">
             <div
               v-for="(message, index) in chatMessages"
               :key="`${message.role}-${index}`"
@@ -715,15 +818,13 @@ onBeforeUnmount(() => {
               @input="userPrompt = $event.target.value"
               type="text"
               class="chatbot-input"
-              placeholder="Ask something about the campus..."
+              :placeholder="isChatLoading ? 'Attendo la risposta...' : 'Chiedi qualcosa sulle lezioni...'"
+              :disabled="isChatLoading"
             >
-            <Transition name="send-btn">
-              <button v-show="userPrompt.trim().length > 0" type="submit" class="chatbot-send" aria-label="Send message">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-              </button>
-            </Transition>
+            <!-- type="submit" invia il form e quindi attiva @submit.prevent sopra. -->
+            <button type="submit" class="chatbot-send" :disabled="isChatLoading">
+              {{ isChatLoading ? 'Invio...' : 'Invia' }}
+            </button>
           </form>
         </div>
       </section>
@@ -1277,6 +1378,12 @@ onBeforeUnmount(() => {
   border-color: rgba(16, 44, 83, 0.45);
 }
 
+.chatbot-input:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+/* Pulsante invio della chat. */
 .chatbot-send {
   border: 0;
   border-radius: 18px;
@@ -1289,28 +1396,12 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.chatbot-send svg {
-  width: 20px;
-  height: 20px;
-  fill: currentColor;
+.chatbot-send:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
-/* Transitions for send button */
-.send-btn-enter-active,
-.send-btn-leave-active {
-  transition: all 0.3s cubic-bezier(0.34, 1.1, 0.64, 1);
-  overflow: hidden;
-}
-
-.send-btn-enter-from,
-.send-btn-leave-to {
-  opacity: 0;
-  width: 0;
-  min-width: 0;
-  margin-left: -8px; /* hides the flex gap */
-  transform: scale(0.6);
-}
-
+/* Classe standard per testo visibile agli screen reader ma nascosto graficamente. */
 .sr-only {
   position: absolute;
   width: 1px;
