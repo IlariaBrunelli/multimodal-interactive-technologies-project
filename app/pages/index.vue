@@ -137,6 +137,7 @@ const showClassroomNavigation = ref(false)
 
 // Stato vero se il microfono sta attivamente registrando
 const isListening = ref(false)
+let speechRecognition: BrowserSpeechRecognition | null = null
 
 // AR Mode states per invocare la videocamera e collassare l'UI
 const isArMode = ref(false)
@@ -385,8 +386,6 @@ function getCampusChatSessionId() {
   if (!import.meta.client) {
     return createCampusChatSessionId()
   }
-}
-
   const existingSessionId = window.localStorage.getItem(campusChatSessionStorageKey)
 
   if (existingSessionId) {
@@ -397,6 +396,31 @@ function getCampusChatSessionId() {
   window.localStorage.setItem(campusChatSessionStorageKey, sessionId)
 
   return sessionId
+}
+
+async function startCamera() {
+  if (!import.meta.client || !videoElement.value) return
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    })
+    videoElement.value.srcObject = cameraStream
+  } catch (error) {
+    console.error('Camera access error:', error)
+    isArMode.value = false
+    alert('Unable to access camera. Please check browser permissions.')
+  }
+}
+
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop())
+    cameraStream = null
+  }
+  if (videoElement.value) {
+    videoElement.value.srcObject = null
+  }
 }
 
 function toggleArMode() {
@@ -532,7 +556,7 @@ onBeforeUnmount(() => {
         
         <div 
           class="hero-actions transition-all duration-700 ease-[cubic-bezier(0.34,1.1,0.64,1)]"
-          :class="isArMode ? 'fixed top-6 left-6 z-50 flex-row items-center gap-4' : 'relative flex-row justify-center gap-[14px]'"
+          :class="isArMode ? 'fixed top-6 left-6 z-50 flex-row items-center gap-4 pointer-events-auto' : 'relative flex-row justify-center gap-[14px]'"
         >
           <button type="button" class="hero-button" @click="toggleArMode" :class="{ 'ar-button-active': isArMode }">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -691,6 +715,24 @@ onBeforeUnmount(() => {
             <div class="drag-bar"></div>
           </div>
 
+          <div class="ai-assistant-block">
+            <div class="chatbot-heading">
+              <h2 id="campus-ai-title">Campus AI Assistant</h2>
+            </div>
+            
+            <div class="prompt-list" aria-label="Suggested prompts">
+              <button
+                v-for="prompt in starterPrompts"
+                :key="prompt"
+                type="button"
+                class="prompt-chip"
+                @click="useStarterPrompt(prompt)"
+              >
+                {{ prompt }}
+              </button>
+            </div>
+          </div>
+
           <div
             class="chatbot-window"
             aria-live="polite"
@@ -702,86 +744,6 @@ onBeforeUnmount(() => {
               'mask-bottom': chatScrollState.bottom && !chatScrollState.top
             }"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="classroom-console">
-          <div class="classroom-response">
-            <div class="classroom-response-header">
-              <span>System response</span>
-              <strong>TODO</strong>
-            </div>
-            <p v-if="classroomLastQuestion" class="classroom-last-question">
-              Asked: {{ classroomLastQuestion }}
-            </p>
-            <p>{{ classroomSystemResponse }}</p>
-          </div>
-
-          <div class="classroom-input-area">
-            <p class="classroom-console-copy">
-              Enable the microphone, say the classroom name, or type the destination manually.
-            </p>
-            <form class="classroom-command-bar" @submit.prevent="submitClassroomQuestion">
-              <button
-                type="button"
-                class="classroom-mic-button"
-                :class="{ 'classroom-mic-button--active': isClassroomListening }"
-                :aria-pressed="isClassroomListening"
-                :aria-label="isClassroomListening ? 'Stop microphone' : 'Enable microphone'"
-                @click="toggleClassroomMicrophone"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
-                </svg>
-              </button>
-              <input
-                v-model="classroomPrompt"
-                type="text"
-                class="classroom-command-input"
-                placeholder="Tell classroom name or ask for a route..."
-              >
-              <button type="submit" class="classroom-ask-button">Ask</button>
-            </form>
-            <p class="classroom-voice-status" aria-live="polite">
-              {{ classroomVoiceStatus }}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Sezione chatbot. aria-labelledby collega la section al titolo h2 con id campus-ai-title. -->
-      <section class="chatbot-section" aria-labelledby="campus-ai-title">
-        <div class="chatbot-copy">
-          <p class="eyebrow">New</p>
-          <div class="chatbot-heading">
-            <h2 id="campus-ai-title">Campus AI Assistant</h2>
-            <span class="chatbot-badge">Calendario lezioni</span>
-          </div>
-          <p class="chatbot-description">
-            Chiedi informazioni sulle lezioni, sugli orari e sui prossimi impegni
-            salvati nel calendario.
-          </p>
-
-          <!-- Lista dei suggerimenti: ogni prompt genera un bottone. -->
-          <!-- Quando clicchi il suggerimento, passa la stringa prompt alla funzione. -->
-          <div class="prompt-list" aria-label="Suggested prompts">
-            <button
-              v-for="prompt in starterPrompts"
-              :key="prompt"
-              type="button"
-              class="prompt-chip"
-              @click="useStarterPrompt(prompt)"
-            >
-              {{ prompt }}
-            </button>
-          </div>
-        </div>
-
-        <div class="chatbot-card">
-          <div class="chatbot-window" aria-live="polite">
             <div
               v-for="(message, index) in chatMessages"
               :key="`${message.role}-${index}`"
@@ -808,22 +770,23 @@ onBeforeUnmount(() => {
                 <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
               </svg>
               
-              <!-- Animate pulsing ring behind microphone just like Android Telegram -->
               <span v-if="isListening" class="absolute inset-0 rounded-full animate-ping bg-blue-400 opacity-20 pointer-events-none"></span>
               <span v-if="isListening" class="absolute inset-0 rounded-full animate-pulse bg-blue-500 opacity-10 pointer-events-none"></span>
             </button>
             <input
               id="campus-ai-input"
-              :value="userPrompt"
-              @input="userPrompt = $event.target.value"
+              v-model="userPrompt"
               type="text"
               class="chatbot-input"
               :placeholder="isChatLoading ? 'Attendo la risposta...' : 'Chiedi qualcosa sulle lezioni...'"
               :disabled="isChatLoading"
             >
-            <!-- type="submit" invia il form e quindi attiva @submit.prevent sopra. -->
             <button type="submit" class="chatbot-send" :disabled="isChatLoading">
-              {{ isChatLoading ? 'Invio...' : 'Invia' }}
+              <svg v-if="!isChatLoading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              <span v-else class="text-xs">...</span>
             </button>
           </form>
         </div>

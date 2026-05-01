@@ -56,5 +56,10 @@ export default defineNuxtConfig({
     server: {
       allowedHosts: true
     }
+  },
+  
+  sourcemap: {
+    server: false,
+    client: false
   }
 })
