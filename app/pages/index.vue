@@ -75,31 +75,36 @@ const isExpanded = ref(false)
 // La sintassi ref<MenuButton[]>(...) dice a TypeScript: "questa ref contiene un array di MenuButton".
 const buttons = ref<MenuButton[]>([
   {
-    // Primo bottone del menu.
     id: 1,
-    text: 'Classroom navigation',
-    link: '/classroom navigation',
-    iconPath: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
-    colorExpanded: 'bg-blue-50 text-blue-600 border-blue-500 hover:bg-blue-100',
-    colorCollapsed: 'bg-white text-blue-500 border-blue-400 hover:bg-blue-50'
+    text: 'Microwaves',
+    link: '/microwaves',
+    iconPath: 'M4 6h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z M8 6v14 M18 10h.01 M18 14h.01',
+    colorExpanded: 'bg-orange-50 text-orange-600 border-orange-500 hover:bg-orange-100',
+    colorCollapsed: 'bg-white text-orange-500 border-orange-400 hover:bg-orange-50'
   },
   {
-    // Secondo bottone del menu.
     id: 2,
-    text: 'TODO',
-    link: '/TODO',
-    iconPath: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-    colorExpanded: 'bg-emerald-50 text-emerald-600 border-emerald-500 hover:bg-emerald-100',
-    colorCollapsed: 'bg-white text-emerald-500 border-emerald-400 hover:bg-emerald-50'
+    text: 'Plugs',
+    link: '/plugs',
+    iconPath: 'M13 10V3L4 14h7v7l9-11h-7z',
+    colorExpanded: 'bg-yellow-50 text-yellow-600 border-yellow-500 hover:bg-yellow-100',
+    colorCollapsed: 'bg-white text-yellow-500 border-yellow-400 hover:bg-yellow-50'
   },
   {
-    // Terzo bottone del menu.
     id: 3,
-    text: 'TODO',
-    link: '/TODO',
-    iconPath: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
-    colorExpanded: 'bg-purple-50 text-purple-600 border-purple-500 hover:bg-purple-100',
-    colorCollapsed: 'bg-white text-purple-500 border-purple-400 hover:bg-purple-50'
+    text: 'Bathrooms',
+    link: '/bathrooms',
+    iconPath: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z',
+    colorExpanded: 'bg-cyan-50 text-cyan-600 border-cyan-500 hover:bg-cyan-100',
+    colorCollapsed: 'bg-white text-cyan-500 border-cyan-400 hover:bg-cyan-50'
+  },
+  {
+    id: 4,
+    text: 'Lunch Places',
+    link: '/lunch',
+    iconPath: 'M9 3v6c0 1.66-1.34 3-3 3s-3-1.34-3-3V3m3 3v15 M15 3v18 M15 3c2.5 0 6 1.5 6 4s-3.5 4-6 4',
+    colorExpanded: 'bg-rose-50 text-rose-600 border-rose-500 hover:bg-rose-100',
+    colorCollapsed: 'bg-white text-rose-500 border-rose-400 hover:bg-rose-50'
   }
 ])
 
@@ -130,23 +135,79 @@ const campusChatSessionStorageKey = 'campus-ai-assistant-session-id'
 // Controlla se il pannello classroom navigation e visibile nella stessa pagina.
 const showClassroomNavigation = ref(false)
 
-// Testo scritto o dettato dall'utente nella barra della classroom navigation.
-const classroomPrompt = ref('')
+// Stato vero se il microfono sta attivamente registrando
+const isListening = ref(false)
 
-// Ultima richiesta inviata nella classroom navigation.
-const classroomLastQuestion = ref('')
+// AR Mode states per invocare la videocamera e collassare l'UI
+const isArMode = ref(false)
+const videoElement = ref<HTMLVideoElement | null>(null)
+let cameraStream: MediaStream | null = null
 
-// Risposta del sistema: per ora rimane TODO, come placeholder per la risposta futura.
-const classroomSystemResponse = ref('TODO')
+// Modal Bottom Sheet State per la Chat
+const isSheetDragging = ref(false)
+const sheetDragY = ref(0)
+const maxDragDistance = 250 // Altezza cumulativa per chiudere services e hero text
 
-// Stato testuale del microfono, utile per spiegare cosa sta succedendo all'utente.
-const classroomVoiceStatus = ref('Microphone ready')
+const sheetProgress = computed(() => {
+  return Math.max(0, Math.min(1, -sheetDragY.value / maxDragDistance))
+})
 
-// True quando il browser sta ascoltando dal microfono.
-const isClassroomListening = ref(false)
+let dragStartY = 0
+let currentDragY = 0
 
-// Riferimento all'oggetto SpeechRecognition, cosi possiamo fermarlo quando serve.
-let classroomRecognition: BrowserSpeechRecognition | null = null
+function onSheetPointerDown(e: PointerEvent) {
+  // Solo tasto sinistro per mouse
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  
+  isSheetDragging.value = true
+  dragStartY = e.clientY
+  currentDragY = sheetDragY.value
+
+  const target = e.currentTarget as HTMLElement
+  target.setPointerCapture(e.pointerId)
+
+  const handleMove = (ev: PointerEvent) => {
+    ev.preventDefault()
+    const deltaY = ev.clientY - dragStartY
+    let newY = currentDragY + deltaY
+    
+    if (!isArMode.value) {
+      if (newY > 0) newY = 0 // Limita verso il basso in normal mode
+    } else {
+      const maxDown = window.innerHeight - 200
+      if (newY > maxDown) newY = maxDown // Allow dragging down in AR mode
+    }
+    
+    sheetDragY.value = newY
+  }
+
+  const handleUp = () => {
+    isSheetDragging.value = false
+    target.releasePointerCapture(e.pointerId)
+    window.removeEventListener('pointermove', handleMove)
+    window.removeEventListener('pointerup', handleUp)
+    
+    // Snap automatico
+    if (isArMode.value) {
+      if (sheetDragY.value > 100) {
+        sheetDragY.value = window.innerHeight - 200 // Snap to hidden at bottom
+      } else if (sheetDragY.value < -100) {
+        sheetDragY.value = -maxDragDistance // Snap to full height
+      } else {
+        sheetDragY.value = 0 // Snap to default
+      }
+    } else {
+      if (sheetDragY.value < -100) {
+        sheetDragY.value = -maxDragDistance
+      } else {
+        sheetDragY.value = 0
+      }
+    }
+  }
+
+  window.addEventListener('pointermove', handleMove, { passive: false })
+  window.addEventListener('pointerup', handleUp)
+}
 
 // Questa funzione apre/chiude il menu dei servizi.
 function toggleExpand() {
@@ -165,12 +226,6 @@ function toggleExpand() {
 // Questa funzione riceve il bottone cliccato.
 // button: MenuButton significa che il parametro deve avere la forma definita sopra.
 function goToPage(button: MenuButton) {
-  // Se il bottone cliccato e quello con id 1, apriamo la schermata nella stessa pagina.
-  if (button.id === 1) {
-    openClassroomNavigation()
-    return
-  }
-
   // Anche qui controlliamo di essere nel browser, perche window esiste solo lato client.
   if (import.meta.client) {
     // Per ora mostra un alert invece di fare una vera navigazione.
@@ -179,127 +234,142 @@ function goToPage(button: MenuButton) {
   }
 }
 
-// Mostra il pannello classroom navigation e chiude il menu espanso.
-function openClassroomNavigation() {
-  showClassroomNavigation.value = true
-  isExpanded.value = false
+const chatbotWindow = ref<HTMLElement | null>(null)
+const chatScrollState = ref({ top: false, bottom: false })
 
-  if (import.meta.client) {
-    document.body.style.overflow = 'hidden'
-  }
+function handleChatScroll() {
+  if (!chatbotWindow.value) return
+  const { scrollTop, scrollHeight, clientHeight } = chatbotWindow.value
+  chatScrollState.value.top = scrollTop > 5
+  chatScrollState.value.bottom = Math.ceil(scrollTop + clientHeight) < scrollHeight - 5
+}
 
-  // nextTick aspetta che Vue aggiorni il DOM prima di cercare l'elemento da scrollare.
+watch(chatMessages, () => {
   nextTick(() => {
-    if (import.meta.client) {
-      document.getElementById('classroom-navigation-panel')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      })
+    if (chatbotWindow.value) {
+      chatbotWindow.value.scrollTop = chatbotWindow.value.scrollHeight
+      handleChatScroll()
     }
   })
-}
+}, { deep: true })
 
-// Nasconde il pannello classroom navigation e ferma il microfono se era attivo.
-function closeClassroomNavigation() {
-  showClassroomNavigation.value = false
-  stopClassroomMicrophone()
-}
+// Questa funzione prende una domanda e restituisce una risposta testuale.
+function answerCampusQuestion(question: string) {
+  // toLowerCase rende tutto minuscolo, cosi i controlli non dipendono da maiuscole/minuscole.
+  const normalized = question.toLowerCase()
 
-// Restituisce il costruttore SpeechRecognition disponibile nel browser, se esiste.
-function getSpeechRecognitionConstructor() {
-  if (!import.meta.client) {
-    return null
+  // includes controlla se una parola e presente nella domanda.
+  if (normalized.includes('library')) {
+    // return termina la funzione e restituisce questa stringa.
+    return 'The main library is open from 8:00 to 20:00 on weekdays. During exams, extended evening hours may be available.'
   }
 
-  const browserWindow = window as BrowserWindowWithSpeech
+  // || significa "oppure": basta che una delle condizioni sia vera.
+  if (normalized.includes('wifi') || normalized.includes('wi-fi') || normalized.includes('internet')) {
+    return 'For campus Wi-Fi support, start from the digital help desk near the main hall or contact IT support through the student portal.'
+  }
 
+  // Qui rispondiamo alle domande che contengono admissions oppure office.
+  if (normalized.includes('admissions') || normalized.includes('office')) {
+    return 'Admissions support is usually located in the welcome area near the main entrance. This draft can later connect to live campus data for exact room details.'
+  }
+
+  // Qui rispondiamo alle domande su edificio, aula o percorso.
+  if (normalized.includes('building') || normalized.includes('classroom') || normalized.includes('reach')) {
+    return 'You can ask for a building or classroom and the assistant can guide you with directions, nearby landmarks, and accessible routes.'
+  }
+
+  // Risposta di fallback: viene usata se nessun if precedente ha fatto return.
+  return 'This is a first chatbot draft: it can welcome users, answer common campus questions, and later connect to live data, maps, and university services.'
+}
+
+// Questa funzione viene usata quando l'utente clicca un suggerimento.
+function useStarterPrompt(prompt: string) {
+  // Copia il suggerimento dentro l'input.
+  userPrompt.value = prompt
+  // Invia subito la domanda come se l'utente avesse premuto Send.
+  submitChat()
+}
+
+// Controllo supporto Browser per il riconoscimento
+function getSpeechRecognition() {
+  if (!import.meta.client) return null
+  const browserWindow = window as BrowserWindowWithSpeech
   return browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition ?? null
 }
 
-// Accende o spegne il microfono in base allo stato attuale.
-function toggleClassroomMicrophone() {
-  if (isClassroomListening.value) {
-    stopClassroomMicrophone()
+function startMicrophone() {
+  const SpeechConstructor = getSpeechRecognition()
+  if (!SpeechConstructor) {
+    // Fallback for browsers like Zen/Firefox that lack native SpeechRecognition engine
+    console.warn('Speech recognition is not supported natively. Using mock for UI testing.')
+    isListening.value = true
+    
+    // Simulate recording duration and then inject fake transcription
+    setTimeout(() => {
+      const mockTranscription = "Where is the main library located?"
+      userPrompt.value = userPrompt.value ? `${userPrompt.value} ${mockTranscription}` : mockTranscription
+      isListening.value = false
+    }, 2800)
     return
   }
 
-  startClassroomMicrophone()
-}
+  speechRecognition = new SpeechConstructor()
+  speechRecognition.lang = import.meta.client ? navigator.language : 'en-US'
+  speechRecognition.continuous = false
+  speechRecognition.interimResults = false
 
-// Avvia l'ascolto vocale e copia la trascrizione dentro la textbar.
-function startClassroomMicrophone() {
-  const SpeechRecognitionConstructor = getSpeechRecognitionConstructor()
-
-  if (!SpeechRecognitionConstructor) {
-    classroomVoiceStatus.value = 'Speech recognition is not supported by this browser.'
-    return
-  }
-
-  classroomRecognition = new SpeechRecognitionConstructor()
-  classroomRecognition.lang = import.meta.client ? navigator.language : 'en-US'
-  classroomRecognition.interimResults = false
-  classroomRecognition.continuous = false
-
-  classroomRecognition.onresult = (event) => {
+  speechRecognition.onresult = (event) => {
     const transcript = Array.from(event.results)
-      .map((result) => result[0]?.transcript ?? '')
+      .map(result => result[0]?.transcript || '')
       .join(' ')
       .trim()
-
+    
     if (transcript) {
-      classroomPrompt.value = transcript
-      classroomVoiceStatus.value = 'Voice input captured. Press Ask to send it.'
+      userPrompt.value = userPrompt.value ? `${userPrompt.value} ${transcript}` : transcript
     }
   }
 
-  classroomRecognition.onerror = (event) => {
-    isClassroomListening.value = false
-    classroomVoiceStatus.value = `Microphone error: ${event.error ?? 'unknown error'}`
+  speechRecognition.onerror = (event) => {
+    isListening.value = false
+    console.error('Microphone error:', event.error)
   }
 
-  classroomRecognition.onend = () => {
-    isClassroomListening.value = false
-  }
-
-  try {
-    classroomRecognition.start()
-    isClassroomListening.value = true
-    classroomVoiceStatus.value = 'Listening... say the classroom name or your navigation question.'
-  } catch {
-    isClassroomListening.value = false
-    classroomVoiceStatus.value = 'The microphone could not be started.'
-  }
-}
-
-// Ferma il riconoscimento vocale se e attivo.
-function stopClassroomMicrophone() {
-  if (!classroomRecognition) {
-    isClassroomListening.value = false
-    return
+  speechRecognition.onend = () => {
+    isListening.value = false
   }
 
   try {
-    classroomRecognition.stop()
-  } catch {
-    // Se il browser ha gia fermato il microfono, non serve fare altro.
+    speechRecognition.start()
+    isListening.value = true
+  } catch (err) {
+    isListening.value = false
+    console.error('Could not start microphone', err)
   }
-
-  classroomRecognition = null
-  isClassroomListening.value = false
-  classroomVoiceStatus.value = 'Microphone stopped'
 }
 
-// Invia la domanda della classroom navigation e prepara l'area risposta.
-function submitClassroomQuestion() {
-  const question = classroomPrompt.value.trim()
-
-  if (!question) {
+function stopMicrophone() {
+  if (!speechRecognition) {
+    isListening.value = false
     return
   }
+  
+  try {
+    speechRecognition.stop()
+  } catch {
+    // gia fermato
+  }
+  
+  speechRecognition = null
+  isListening.value = false
+}
 
-  classroomLastQuestion.value = question
-  classroomSystemResponse.value = 'TODO'
-  classroomPrompt.value = ''
+function toggleMicrophone() {
+  if (isListening.value) {
+    stopMicrophone()
+  } else {
+    startMicrophone()
+  }
 }
 
 function createCampusChatSessionId() {
@@ -315,6 +385,7 @@ function getCampusChatSessionId() {
   if (!import.meta.client) {
     return createCampusChatSessionId()
   }
+}
 
   const existingSessionId = window.localStorage.getItem(campusChatSessionStorageKey)
 
@@ -328,12 +399,13 @@ function getCampusChatSessionId() {
   return sessionId
 }
 
-// Questa funzione viene usata quando l'utente clicca un suggerimento.
-function useStarterPrompt(prompt: string) {
-  // Copia il suggerimento dentro l'input.
-  userPrompt.value = prompt
-  // Invia subito la domanda come se l'utente avesse premuto Send.
-  submitChat()
+function toggleArMode() {
+  isArMode.value = !isArMode.value
+  if (isArMode.value) {
+    startCamera()
+  } else {
+    stopCamera()
+  }
 }
 
 // Questa funzione gestisce l'invio del form della chat.
@@ -394,10 +466,16 @@ async function submitChat() {
   }
 }
 
+onMounted(() => {
+  nextTick(handleChatScroll)
+  window.addEventListener('resize', handleChatScroll)
+})
+
 // onBeforeUnmount viene eseguito quando il componente sta per essere rimosso dalla pagina.
 onBeforeUnmount(() => {
-  // Ferma anche il microfono se l'utente cambia pagina mentre sta ascoltando.
-  stopClassroomMicrophone()
+  window.removeEventListener('resize', handleChatScroll)
+  stopMicrophone()
+  stopCamera()
 
   // Ripristina lo scroll nel caso il componente venga chiuso mentre il menu e aperto.
   if (import.meta.client) {
@@ -407,11 +485,23 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="home-shell">
-    <div class="background-orb orb-left" />
-    <div class="background-orb orb-right" />
+  <main class="home-shell" :class="{ 'bg-black': isArMode }">
+    <!-- Camera background -->
+    <video 
+      ref="videoElement" 
+      autoplay 
+      playsinline 
+      muted 
+      class="ar-camera-view transition-opacity duration-[800ms] pointer-events-none"
+      :class="isArMode ? 'opacity-100' : 'opacity-0'" 
+    />
 
-    <NuxtLink class="login-link" to="/login" aria-label="Open login page">
+    <!-- Gradienti atmosferici originali -->
+    <div class="background-orb orb-left transition-opacity duration-500" :class="isArMode ? 'opacity-0' : 'opacity-80'" />
+    <div class="background-orb orb-right transition-opacity duration-500" :class="isArMode ? 'opacity-0' : 'opacity-80'" />
+
+    <!-- Pulsante Login -->
+    <NuxtLink class="login-link transition-opacity duration-500" :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'" to="/login" aria-label="Open login page">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
       </svg>
@@ -419,39 +509,74 @@ onBeforeUnmount(() => {
 
     <section class="home-panel">
       <!-- Card principale della pagina. -->
-      <div class="hero-card">
-        <p class="eyebrow">Home</p>
-        <h1>Start Guided Tour.</h1>
-        <p class="hero-copy">
-          You can use AR mode for an immersive experience
-        </p>
-        <div class="hero-actions">
-          <button type="button" class="hero-button">AR Mode</button>
-          <button type="button" class="hero-button">Text Mode</button>
+      <div class="hero-card transition-all duration-500" :class="isArMode ? '!bg-transparent !border-transparent !shadow-none !backdrop-blur-none !p-0 !m-0 pointer-events-none' : ''">
+        <div 
+          class="transition-all duration-300"
+          :class="[
+            !isSheetDragging ? 'transition-all duration-300' : '',
+            isArMode ? 'opacity-0 pointer-events-none translate-y-[-20px]' : ''
+          ]"
+          :style="{ 
+            opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 2), 
+            height: isArMode ? '0px' : `${(1 - sheetProgress) * 76}px`,
+            transform: isArMode ? 'translateY(-20px)' : `scale(${1 - sheetProgress * 0.1})`,
+            overflow: 'hidden',
+            transformOrigin: 'top center'
+          }"
+        >
+          <h1>AR Experience</h1>
+          <p class="hero-copy">
+            You can use AR mode for an immersive experience
+          </p>
+        </div>
+        
+        <div 
+          class="hero-actions transition-all duration-700 ease-[cubic-bezier(0.34,1.1,0.64,1)]"
+          :class="isArMode ? 'fixed top-6 left-6 z-50 flex-row items-center gap-4' : 'relative flex-row justify-center gap-[14px]'"
+        >
+          <button type="button" class="hero-button" @click="toggleArMode" :class="{ 'ar-button-active': isArMode }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+              <line x1="12" y1="22.08" x2="12" y2="12" />
+            </svg>
+            {{ isArMode ? 'Exit AR Mode' : 'AR Mode' }}
+          </button>
+          <button type="button" class="hero-button transition-all duration-500 delay-100" :class="isArMode ? 'translate-x-0' : ''">Guided Tour</button>
         </div>
       </div>
 
       <!-- Sezione del menu animato dei servizi. -->
-      <section class="services-menu-section">
-        <div class="app-container">
+      <section 
+        class="services-menu-section"
+        :class="[
+          !isSheetDragging ? 'transition-all duration-300' : '',
+          isArMode ? 'opacity-0 pointer-events-none translate-y-10' : ''
+        ]"
+        :style="{ 
+          opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 1.5), 
+          height: isArMode ? '0px' : `${(1 - sheetProgress) * 176}px`,
+          overflow: sheetProgress > 0 || isArMode ? 'hidden' : 'visible'
+        }"
+      >
           <div
-            class="w-full flex items-center justify-center transition-colors duration-[800ms]"
-            :class="isExpanded ? 'fixed inset-0 z-40 bg-white' : 'rounded-[2.5rem] bg-gray-50/90 p-4'"
+            class="w-full flex items-center justify-center transition-colors duration-500"
+            :class="isExpanded ? 'fixed inset-0 z-40 bg-white' : ''"
           >
             <div
-              class="bg-white transition-all duration-[800ms] ease-[cubic-bezier(0.34,1.1,0.64,1)] flex flex-col overflow-hidden"
+              class="transition-all duration-500 ease-[cubic-bezier(0.34,1.1,0.64,1)] flex flex-col overflow-hidden"
               :class="isExpanded
-                ? 'w-[100vw] h-[100vh] p-8 sm:p-12 rounded-none z-50'
-                : 'w-full max-w-xs h-60 p-6 rounded-[2rem] shadow-xl border border-gray-100 cursor-pointer hover:shadow-2xl relative'"
+                ? 'bg-white w-[100vw] h-[100vh] pt-28 px-8 pb-8 sm:px-12 rounded-none z-50'
+                : 'services-card-collapsed w-full h-44 p-6 cursor-pointer relative'"
               @click="!isExpanded && toggleExpand()"
             >
               <div
-                class="flex items-center justify-between transition-all duration-[800ms]"
+                class="flex items-center justify-between transition-all duration-500"
                 :class="isExpanded ? 'mb-16 sm:mb-20' : 'mb-6'"
               >
                 <span
-                  class="font-black tracking-tight text-gray-900 transition-all duration-[800ms]"
-                  :class="isExpanded ? 'text-5xl sm:text-6xl' : 'text-xl'"
+                  class="transition-all duration-500"
+                  :class="isExpanded ? 'text-3xl sm:text-4xl' : 'text-[clamp(1.4rem,2.5vw,2.2rem)]'"
                 >
                   Main Services
                 </span>
@@ -460,14 +585,14 @@ onBeforeUnmount(() => {
                   type="button"
                   :aria-expanded="isExpanded"
                   :aria-label="isExpanded ? 'Close services menu' : 'Open services menu'"
-                  class="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-all duration-[800ms] focus:outline-none z-20 relative"
-                  :class="isExpanded ? 'text-gray-400' : 'text-blue-500'"
+                  class="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-all duration-500 focus:outline-none z-20 relative"
+                  :class="isExpanded ? 'text-gray-400' : 'text-[#102C53]'"
                   @click.stop="toggleExpand"
                 >
                   <div class="relative w-7 h-7">
                     <svg
                       :class="isExpanded ? 'opacity-0 scale-50 rotate-90' : 'opacity-100 scale-100 rotate-0'"
-                      class="absolute inset-0 w-7 h-7 transition-all duration-500"
+                      class="absolute inset-0 w-7 h-7 transition-all duration-300"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -476,7 +601,7 @@ onBeforeUnmount(() => {
                     </svg>
                     <svg
                       :class="isExpanded ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-50 -rotate-90'"
-                      class="absolute inset-0 w-7 h-7 transition-all duration-500"
+                      class="absolute inset-0 w-7 h-7 transition-all duration-300"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -488,7 +613,7 @@ onBeforeUnmount(() => {
               </div>
 
               <div
-                class="transition-all duration-[800ms] flex flex-col w-full"
+                class="transition-all duration-500 flex flex-col w-full"
                 :class="isExpanded ? 'flex-1 justify-start max-w-3xl mx-auto' : 'justify-start'"
               >
                 <div class="relative w-full" :style="{ height: isExpanded ? '190px' : '56px' }">
@@ -496,13 +621,13 @@ onBeforeUnmount(() => {
                     v-for="(button, index) in buttons"
                     :key="button.id"
                     type="button"
-                    class="absolute transition-all duration-[800ms] flex items-center justify-center overflow-hidden group focus:outline-none border-2"
+                    class="absolute transition-all duration-500 flex items-center justify-center overflow-hidden group focus:outline-none border-2"
                     :style="{
-                      transitionDelay: isExpanded ? `${index * 120}ms` : `${(2 - index) * 40}ms`,
+                      transitionDelay: isExpanded ? `${index * 60}ms` : `${(3 - index) * 30}ms`,
                       transitionTimingFunction: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
-                      top: isExpanded ? (index === 2 ? '104px' : '0px') : '0px',
-                      left: isExpanded ? (index === 1 ? 'calc(50% + 10px)' : '0px') : `${index * 68}px`,
-                      width: isExpanded ? (index === 2 ? '100%' : 'calc(50% - 10px)') : '56px',
+                      top: isExpanded ? (index > 1 ? '104px' : '0px') : '0px',
+                      left: isExpanded ? (index % 2 === 1 ? 'calc(50% + 8px)' : '0px') : `calc((100% - 56px) / 3 * ${index})`,
+                      width: isExpanded ? 'calc(50% - 8px)' : '56px',
                       height: isExpanded ? '80px' : '56px',
                       borderRadius: isExpanded ? '1.5rem' : '50%'
                     }"
@@ -513,25 +638,25 @@ onBeforeUnmount(() => {
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      class="absolute transition-all duration-[500ms] w-7 h-7"
+                      class="absolute transition-all duration-[400ms] w-7 h-7"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       stroke-width="2.5"
-                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(2 - index) * 40 + 350}ms` }"
+                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(3 - index) * 40 + 200}ms` }"
                       :class="isExpanded ? 'opacity-0 scale-50' : 'opacity-100 scale-100'"
                     >
                       <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
                     </svg>
 
                     <div
-                      class="flex items-center space-x-4 transition-all duration-[500ms]"
-                      :style="{ transitionDelay: isExpanded ? `${index * 120 + 400}ms` : '0ms' }"
+                      class="flex items-center justify-center gap-2 sm:gap-3 transition-all duration-300 w-full px-2"
+                      :style="{ transitionDelay: isExpanded ? `${index * 80 + 200}ms` : '0ms' }"
                       :class="isExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-75'"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        class="w-7 h-7 shrink-0"
+                        class="w-6 h-6 sm:w-7 sm:h-7 shrink-0"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -539,47 +664,43 @@ onBeforeUnmount(() => {
                       >
                         <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
                       </svg>
-                      <span class="font-bold text-xl sm:text-2xl tracking-tight">{{ button.text }}</span>
+                      <span class="font-bold text-[1.05rem] sm:text-xl tracking-tight leading-tight text-left">{{ button.text }}</span>
                     </div>
                   </button>
                 </div>
               </div>
 
-              <p
-                class="transition-all duration-300 text-sm font-medium text-gray-400 absolute bottom-6 left-6"
-                :class="isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100 delay-500'"
-              >
-                Tocca per esplorare
-              </p>
-
               <div
-                class="transition-all duration-[800ms] text-center text-gray-300 pb-8"
-                :class="isExpanded ? 'opacity-100 delay-[800ms]' : 'opacity-0 absolute bottom-0 pointer-events-none w-full left-0'"
+                class="transition-all duration-500 text-center text-gray-300 pb-8"
+                :class="isExpanded ? 'opacity-100 delay-500' : 'opacity-0 absolute bottom-0 pointer-events-none w-full left-0'"
               >
                 <p class="uppercase tracking-widest text-xs font-bold">Menu Navigazione</p>
               </div>
+              </div>
             </div>
-          </div>
-        </div>
       </section>
 
-      <section
-        v-if="showClassroomNavigation"
-        id="classroom-navigation-panel"
-        class="classroom-navigation"
-        aria-labelledby="classroom-navigation-title"
-      >
-        <div class="classroom-navigation-header">
-          <div>
-            <p class="eyebrow">Classroom navigation</p>
-            <h2 id="classroom-navigation-title">Reach the target classroom</h2>
+      <!-- Sezione chatbot. -->
+      <section class="chatbot-section" aria-label="Campus AI Assistant">
+        <div 
+          class="chatbot-card"
+          :class="{ 'chatbot-card--dragging': isSheetDragging, 'transition-all duration-300': !isSheetDragging }"
+          :style="{ transform: (isArMode && sheetDragY > 0) ? `translateY(${sheetDragY}px)` : 'translateY(0px)' }"
+        >
+          <div class="drag-handle" @pointerdown="onSheetPointerDown">
+            <div class="drag-bar"></div>
           </div>
 
-          <button
-            type="button"
-            class="classroom-close"
-            aria-label="Close classroom navigation"
-            @click="closeClassroomNavigation"
+          <div
+            class="chatbot-window"
+            aria-live="polite"
+            ref="chatbotWindow"
+            @scroll="handleChatScroll"
+            :class="{
+              'mask-both': chatScrollState.top && chatScrollState.bottom,
+              'mask-top': chatScrollState.top && !chatScrollState.bottom,
+              'mask-bottom': chatScrollState.bottom && !chatScrollState.top
+            }"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
@@ -673,29 +794,28 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="ai-assistant-block">
-            <div class="chatbot-heading">
-              <h2 id="campus-ai-title">Campus AI Assistant</h2>
-            </div>
-
-            <div class="prompt-list" aria-label="Suggested prompts">
-              <button
-                v-for="prompt in starterPrompts"
-                :key="prompt"
-                type="button"
-                class="prompt-chip"
-                @click="useStarterPrompt(prompt)"
-              >
-                {{ prompt }}
-              </button>
-            </div>
-          </div>
-
           <form class="chatbot-form" @submit.prevent="submitChat">
             <label class="sr-only" for="campus-ai-input">Ask the campus assistant</label>
+            <button
+              type="button"
+              class="chatbot-mic-button"
+              :class="{ 'chatbot-mic-button--listening': isListening }"
+              :aria-pressed="isListening"
+              :aria-label="isListening ? 'Stop recording' : 'Enable microphone'"
+              @click="toggleMicrophone"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="transition-transform duration-300" :class="{ 'scale-110': isListening }">
+                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
+              </svg>
+              
+              <!-- Animate pulsing ring behind microphone just like Android Telegram -->
+              <span v-if="isListening" class="absolute inset-0 rounded-full animate-ping bg-blue-400 opacity-20 pointer-events-none"></span>
+              <span v-if="isListening" class="absolute inset-0 rounded-full animate-pulse bg-blue-500 opacity-10 pointer-events-none"></span>
+            </button>
             <input
               id="campus-ai-input"
-              v-model="userPrompt"
+              :value="userPrompt"
+              @input="userPrompt = $event.target.value"
               type="text"
               class="chatbot-input"
               :placeholder="isChatLoading ? 'Attendo la risposta...' : 'Chiedi qualcosa sulle lezioni...'"
@@ -712,16 +832,24 @@ onBeforeUnmount(() => {
   </main>
 </template>
 
+
 <style scoped>
+:global(html) {
+  height: 100%;
+  overflow: hidden; /* signals to the browser this page does not scroll */
+}
+
 :global(body) {
   margin: 0;
-  font-family: "Segoe UI", sans-serif;
+  height: 100%;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(255, 200, 87, 0.24), transparent 30%),
-    linear-gradient(180deg, #fff8ef 0%, #f4efe8 100%);
-  color: #1f2937;
+    radial-gradient(circle at top left, rgba(16, 44, 83, 0.15), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #e0dcdc 100%);
+  color: #000000;
   overflow: hidden; /* prevents body scroll */
 }
+
 
 :global(a) {
   color: inherit;
@@ -731,10 +859,10 @@ onBeforeUnmount(() => {
 .home-shell {
   --panel-bg: rgba(255, 255, 255, 0.78);
   --panel-border: rgba(148, 163, 184, 0.22);
-  --primary: #d97706;
-  --primary-dark: #9a3412;
-  --shadow: 0 28px 60px rgba(120, 53, 15, 0.16);
-  height: 100vh;
+  --primary: #102C53;
+  --primary-dark: #000000;
+  --shadow: 0 28px 60px rgba(16, 44, 83, 0.16);
+  height: 100dvh;
   position: relative;
   overflow: hidden;
   display: flex;
@@ -754,7 +882,7 @@ onBeforeUnmount(() => {
 .orb-left {
   width: 240px;
   height: 240px;
-  background: rgba(251, 191, 36, 0.22);
+  background: rgba(16, 44, 83, 0.15);
   top: 5%;
   left: -80px;
 }
@@ -762,7 +890,7 @@ onBeforeUnmount(() => {
 .orb-right {
   width: 320px;
   height: 320px;
-  background: rgba(249, 115, 22, 0.14);
+  background: rgba(16, 44, 83, 0.1);
   bottom: -120px;
   right: -80px;
 }
@@ -806,23 +934,29 @@ onBeforeUnmount(() => {
   fill: var(--primary-dark);
 }
 
-.hero-card {
+.hero-card,
+.services-card-collapsed {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 28px;
-  padding: 16px; /* reduced padding */
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
-  text-align: center;
   flex-shrink: 0;
 }
+
+.hero-card {
+  padding: 16px; /* reduced padding */
+  text-align: center;
+}
+
+
 
 .eyebrow {
   margin: 0 0 6px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.7rem;
-  color: #b45309;
+  color: #102C53;
 }
 
 .hero-card h1 {
@@ -842,19 +976,23 @@ onBeforeUnmount(() => {
 .hero-button {
   border: 0;
   border-radius: 999px;
-  padding: 10px 20px; /* reduced padding */
-  font-size: 0.9rem;
+  padding: 12px 24px;
+  font-size: 1.05rem;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   color: #fff;
-  background: linear-gradient(135deg, var(--primary), #f97316);
-  box-shadow: 0 16px 28px rgba(217, 119, 6, 0.28);
+  background: linear-gradient(135deg, var(--primary), #1a427a);
+  box-shadow: 0 16px 28px rgba(16, 44, 83, 0.28);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hero-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 20px 34px rgba(217, 119, 6, 0.35);
+  box-shadow: 0 20px 34px rgba(16, 44, 83, 0.35);
 }
 
 .hero-actions {
@@ -1019,54 +1157,64 @@ onBeforeUnmount(() => {
   font-size: 0.85rem;
 }
 
-.classroom-response-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-  color: #0f766e;
-  font-weight: 800;
-}
-
-.classroom-response-header strong {
-  padding: 4px 8px;
-  border-radius: 8px;
-  background: rgba(15, 118, 110, 0.12);
-  font-size: 0.75rem;
-}
-
-.classroom-last-question {
-  margin: 0 0 8px;
-  color: #0f766e;
-  font-weight: 700;
-}
-
-.classroom-response p {
-  margin: 0;
-}
 
 .chatbot-section {
   display: flex;
   flex-direction: column;
   flex: 1; /* take remaining vertical space */
   min-height: 0; /* needed for flex children to shrink */
+  transition: flex 0.3s ease;
 }
 
 .chatbot-card {
   border-radius: 28px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 -4px 30px rgba(15, 23, 42, 0.06);
   backdrop-filter: blur(18px);
   padding: 16px;
+  padding-top: 8px; /* reduced for handle */
   display: flex;
   flex-direction: column;
   min-height: 0;
   flex: 1;
   gap: 10px;
   background:
-    linear-gradient(180deg, rgba(255, 251, 235, 0.95) 0%, rgba(255, 255, 255, 0.82) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(224, 220, 220, 0.6) 100%);
+}
+
+.chatbot-card--dragging {
+  box-shadow: 0 -22px 50px rgba(16, 44, 83, 0.12);
+}
+
+.drag-handle {
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0px;
+  margin-bottom: 4px;
+  cursor: grab;
+  touch-action: none; /* Prevent scroll on touch */
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-bar {
+  width: 48px;
+  height: 5px;
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
+  transition: background 0.2s ease, width 0.2s ease;
+}
+
+.drag-handle:hover .drag-bar {
+  background: rgba(148, 163, 184, 0.7);
+  width: 60px;
 }
 
 .ai-assistant-block {
@@ -1085,7 +1233,7 @@ onBeforeUnmount(() => {
 .chatbot-heading h2 {
   margin: 0;
   font-size: clamp(1.1rem, 2vw, 1.4rem); /* reduced size */
-  color: #7c2d12;
+  color: #102C53;
 }
 
 .prompt-list {
@@ -1098,8 +1246,8 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: 999px;
   padding: 8px 12px; /* reduced */
-  background: linear-gradient(135deg, rgba(255, 237, 213, 0.95), rgba(254, 215, 170, 0.9));
-  color: #9a3412;
+  background: linear-gradient(135deg, rgba(224, 220, 220, 0.95), #ffffff);
+  color: #102C53;
   font-size: 0.8rem; /* reduced */
   font-weight: 600;
   cursor: pointer;
@@ -1108,20 +1256,33 @@ onBeforeUnmount(() => {
 
 .prompt-chip:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 22px rgba(217, 119, 6, 0.18);
+  box-shadow: 0 12px 22px rgba(16, 44, 83, 0.18);
 }
 
 .chatbot-window {
   min-height: 0; /* allows shrinking */
   flex: 1; /* takes all space possible */
   overflow-y: auto;
-  padding: 10px; /* reduced */
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(251, 191, 36, 0.22);
+  padding: 10px 4px; /* gives a slightly freer horizontal alignment */
+  background: transparent;
+  border: none;
   display: grid;
   align-content: start; /* align messages to top */
   gap: 10px; /* reduced */
+  transition: mask-image 0.2s ease, -webkit-mask-image 0.2s ease;
+}
+
+.chatbot-window.mask-both {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent);
+}
+.chatbot-window.mask-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 16px, black 100%);
+  mask-image: linear-gradient(to bottom, transparent, black 16px, black 100%);
+}
+.chatbot-window.mask-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 16px), transparent);
 }
 
 .message-row {
@@ -1145,26 +1306,64 @@ onBeforeUnmount(() => {
 }
 
 .message-bubble--assistant {
-  background: #fff7ed;
-  color: #7c2d12;
+  background: #f0f4f8;
+  color: #102C53;
   border-top-left-radius: 6px;
 }
 
 .message-bubble--user {
-  background: linear-gradient(135deg, var(--primary), #f97316);
+  background: linear-gradient(135deg, var(--primary), #1a427a);
   color: #fff;
   border-top-right-radius: 6px;
 }
 
 .chatbot-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  align-items: stretch;
   gap: 8px; /* reduced */
   flex-shrink: 0;
 }
 
+.chatbot-mic-button {
+  width: 44px;
+  min-width: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #102C53;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.chatbot-mic-button:hover {
+  border-color: rgba(16, 44, 83, 0.45);
+}
+
+.chatbot-mic-button--listening {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.chatbot-mic-button--listening:hover {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.chatbot-mic-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  position: relative;
+  z-index: 2;
+}
+
 .chatbot-input {
-  width: 100%;
+  min-width: 0;
+  flex: 1;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 18px;
   padding: 12px 14px; /* reduced */
@@ -1175,8 +1374,8 @@ onBeforeUnmount(() => {
 }
 
 .chatbot-input:focus {
-  outline: 2px solid rgba(217, 119, 6, 0.2);
-  border-color: rgba(217, 119, 6, 0.45);
+  outline: 2px solid rgba(16, 44, 83, 0.2);
+  border-color: rgba(16, 44, 83, 0.45);
 }
 
 .chatbot-input:disabled {
@@ -1188,12 +1387,12 @@ onBeforeUnmount(() => {
 .chatbot-send {
   border: 0;
   border-radius: 18px;
-  padding: 0 16px; /* reduced */
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
+  width: 44px;
+  min-width: 44px;
+  display: grid;
+  place-items: center;
   color: #fff;
-  background: linear-gradient(135deg, #c2410c, #f97316);
+  background: linear-gradient(135deg, var(--primary), #1a427a);
   cursor: pointer;
 }
 
@@ -1258,12 +1457,27 @@ onBeforeUnmount(() => {
     flex-direction: column;
   }
 
-  .chatbot-form {
-    grid-template-columns: 1fr;
-  }
-
   .chatbot-send {
     min-height: 42px;
   }
+}
+
+.ar-camera-view {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+  background: #000;
+}
+
+.ar-button-active {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #102C53 !important;
+  border: 1px solid rgba(16, 44, 83, 0.2);
+}
+.ar-button-active svg {
+  stroke: #102C53 !important;
 }
 </style>
