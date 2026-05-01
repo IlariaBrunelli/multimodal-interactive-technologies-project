@@ -360,15 +360,22 @@ async function submitChat() {
   // Aggiunge un messaggio temporaneo mentre la route server interroga n8n.
   const assistantMessageIndex = chatMessages.value.push({
     role: 'assistant',
-    text: 'Sto controllando il calendario...'
+    text: 'Sto elaborando la tua richiesta...'
   }) - 1
 
   // Svuota l'input dopo l'invio.
   userPrompt.value = ''
 
   try {
+    // Recupera il token di sessione di Supabase (JWT)
+    const supabase = useSupabaseClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+
     const response = await $fetch<CampusChatResponse>('/api/campus-chat', {
       method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      timeout: 600000, // 10 minutes timeout for slow local LLM responses
       body: {
         message: question,
         sessionId: getCampusChatSessionId()
@@ -379,10 +386,11 @@ async function submitChat() {
       role: 'assistant',
       text: response.reply
     }
-  } catch {
+  } catch (error: any) {
+    const errorMsg = error.data?.statusMessage || error.message || 'Errore sconosciuto'
     chatMessages.value[assistantMessageIndex] = {
       role: 'assistant',
-      text: 'Non riesco a contattare l agente del calendario in questo momento. Riprova tra poco.'
+      text: `Non riesco a contattare l'agente in questo momento. (${errorMsg})`
     }
   } finally {
     isChatLoading.value = false

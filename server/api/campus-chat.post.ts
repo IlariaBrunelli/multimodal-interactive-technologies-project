@@ -1,46 +1,3 @@
-type CampusChatRequest = {
-  message?: unknown
-  sessionId?: unknown
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function extractReply(value: unknown): string {
-  if (typeof value === 'string') {
-    return value.trim()
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const reply = extractReply(item)
-
-      if (reply) {
-        return reply
-      }
-    }
-
-    return ''
-  }
-
-  if (!isRecord(value)) {
-    return ''
-  }
-
-  const replyFields = ['output', 'reply', 'answer', 'response', 'text', 'message', 'content']
-
-  for (const field of replyFields) {
-    const reply = extractReply(value[field])
-
-    if (reply) {
-      return reply
-    }
-  }
-
-  return ''
-}
-
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const webhookUrl = config.n8nCampusChatWebhook
@@ -52,8 +9,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody<CampusChatRequest>(event)
-  const message = typeof body.message === 'string' ? body.message.trim() : ''
+  const body = await readBody<{ message?: string; sessionId?: string }>(event)
+  const message = body?.message?.trim()
 
   if (!message) {
     throw createError({
@@ -62,30 +19,41 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const sessionId = typeof body.sessionId === 'string' && body.sessionId.trim()
-    ? body.sessionId.trim()
-    : `campus-${Date.now()}`
-
-  const n8nResponse = await $fetch<unknown>(webhookUrl, {
-    method: 'POST',
-    body: {
-      action: 'sendMessage',
-      sessionId,
-      chatInput: message
-    }
-  })
-
-  const reply = extractReply(n8nResponse)
-
-  if (!reply) {
-    throw createError({
-      statusCode: 502,
-      statusMessage: 'n8n response did not contain a reply'
-    })
+  // Forward the Authorization header for the "Decode a JWT" step in n8n
+  const authHeader = getHeader(event, 'authorization')
+  const headers: Record<string, string> = {}
+  if (authHeader) {
+    headers['Authorization'] = authHeader
   }
 
-  return {
-    reply,
-    sessionId
+  try {
+    // The webhook call will run on n8n and return an answer with the message content in a json with "text" string field
+    const n8nResponse = await $fetch<{ text: string }>(webhookUrl, {
+      method: 'POST',
+      headers,
+      timeout: 600000, // 10 minutes timeout for local LLMs like Ollama
+      body: {
+        message,
+        sessionId: body.sessionId
+      }
+    })
+
+    if (!n8nResponse || typeof n8nResponse.text !== 'string') {
+      throw createError({
+        statusCode: 502,
+        statusMessage: 'n8n response did not contain a "text" string field'
+      })
+    }
+
+    return {
+      reply: n8nResponse.text,
+      sessionId: body.sessionId
+    }
+  } catch (error: any) {
+    console.error('N8N Webhook Error:', error)
+    throw createError({
+      statusCode: 502,
+      statusMessage: `n8n Webhook Error: ${error.message || 'Unknown error'}`
+    })
   }
 })
