@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import type { ArPermissionState } from '~/composables/useCampusAr'
+import { demoCampusBuildings, type CampusBuilding } from '~/data/campusBuildings'
+import { useCampusAr } from '~/composables/useCampusAr'
+
 // In Nuxt/Vue, <script setup> rende disponibili variabili e funzioni direttamente nel template.
 // lang="ts" significa che questo blocco usa TypeScript, quindi possiamo dichiarare tipi.
 
@@ -29,6 +33,23 @@ type ChatMessage = {
 type CampusChatResponse = {
   reply: string
   sessionId: string
+}
+
+type CampusBuildingRow = {
+  id?: string | number | null
+  name?: string | null
+  title?: string | null
+  building_name?: string | null
+  latitude?: number | string | null
+  longitude?: number | string | null
+  lat?: number | string | null
+  lng?: number | string | null
+  lon?: number | string | null
+  long?: number | string | null
+  altitude?: number | string | null
+  label_altitude?: number | string | null
+  labelAltitude?: number | string | null
+  color?: string | null
 }
 
 // Tipo minimo per usare la Web Speech API senza importare librerie esterne.
@@ -143,6 +164,18 @@ let speechRecognition: BrowserSpeechRecognition | null = null
 const isArMode = ref(false)
 const videoElement = ref<HTMLVideoElement | null>(null)
 let cameraStream: MediaStream | null = null
+const cameraPermissionState = ref<ArPermissionState>('idle')
+const isRequestingArAccess = ref(false)
+const arBuildings = ref<CampusBuilding[]>(demoCampusBuildings)
+const arBuildingSource = ref('Local demo dataset')
+const isArBuildingsLoading = ref(false)
+const {
+  markers: arMarkers,
+  primaryMarker: primaryArMarker,
+  status: arStatus,
+  start: startCampusAr,
+  stop: stopCampusAr
+} = useCampusAr(arBuildings)
 
 // Modal Bottom Sheet State per la Chat
 const isSheetDragging = ref(false)
@@ -398,18 +431,130 @@ function getCampusChatSessionId() {
   return sessionId
 }
 
+function parseCoordinateValue(value: number | string | null | undefined, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const parsedValue = Number.parseFloat(value)
+
+    if (Number.isFinite(parsedValue)) {
+      return parsedValue
+    }
+  }
+
+  return fallback
+}
+
+function parseCoordinateCandidate(...values: Array<number | string | null | undefined>) {
+  for (const value of values) {
+    const parsedValue = parseCoordinateValue(value, Number.NaN)
+
+    if (Number.isFinite(parsedValue)) {
+      return parsedValue
+    }
+  }
+
+  return Number.NaN
+}
+
+function mapCampusBuildingRow(row: CampusBuildingRow): CampusBuilding | null {
+  const name = row.name ?? row.title ?? row.building_name ?? null
+  const id = row.id ?? name
+
+  if (!id || !name) {
+    return null
+  }
+
+  const latitude = parseCoordinateCandidate(row.latitude, row.lat)
+  const longitude = parseCoordinateCandidate(row.longitude, row.long, row.lng, row.lon)
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null
+  }
+
+  return {
+    id: String(id),
+    name,
+    latitude,
+    longitude,
+    altitude: parseCoordinateValue(row.altitude, 0),
+    labelAltitude: parseCoordinateValue(row.label_altitude ?? row.labelAltitude, 12),
+    color: row.color ?? undefined
+  }
+}
+
+async function fetchCampusBuildings(tableName: string) {
+  const supabase = useSupabaseClient()
+  const { data, error } = await supabase.from(tableName).select('*')
+
+  if (error) {
+    throw error
+  }
+
+  return ((data ?? []) as CampusBuildingRow[])
+    .map(mapCampusBuildingRow)
+    .filter((building): building is CampusBuilding => building !== null)
+    .sort((left, right) => left.name.localeCompare(right.name))
+}
+
+async function loadCampusBuildings() {
+  if (isArBuildingsLoading.value) {
+    return
+  }
+
+  isArBuildingsLoading.value = true
+
+  try {
+    for (const source of [
+      { tableName: 'buildings', label: 'Supabase buildings' },
+      { tableName: 'campus_buildings', label: 'Supabase campus_buildings' }
+    ]) {
+      try {
+        const mappedBuildings = await fetchCampusBuildings(source.tableName)
+
+        if (mappedBuildings.length > 0) {
+          arBuildings.value = mappedBuildings
+          arBuildingSource.value = source.label
+          return
+        }
+      } catch (error) {
+        console.warn(`Unable to load ${source.tableName}.`, error)
+      }
+    }
+  } finally {
+    isArBuildingsLoading.value = false
+  }
+
+  arBuildings.value = demoCampusBuildings
+  arBuildingSource.value = 'Local demo dataset'
+}
+
 async function startCamera() {
-  if (!import.meta.client || !videoElement.value) return
+  if (!import.meta.client || !videoElement.value) return false
+
+  cameraPermissionState.value = 'prompt'
 
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
+      audio: false,
+      video: {
+        facingMode: {
+          ideal: 'environment'
+        }
+      }
     })
     videoElement.value.srcObject = cameraStream
+    await videoElement.value.play().catch(() => undefined)
+    cameraPermissionState.value = 'granted'
+    return true
   } catch (error) {
     console.error('Camera access error:', error)
+    cameraPermissionState.value = 'denied'
     isArMode.value = false
     alert('Unable to access camera. Please check browser permissions.')
+    return false
   }
 }
 
@@ -423,13 +568,52 @@ function stopCamera() {
   }
 }
 
-function toggleArMode() {
-  isArMode.value = !isArMode.value
-  if (isArMode.value) {
-    startCamera()
-  } else {
-    stopCamera()
+async function requestArAccess() {
+  if (!import.meta.client || isRequestingArAccess.value) {
+    return
   }
+
+  isRequestingArAccess.value = true
+
+  try {
+    const locationAndWatchPromise = startCampusAr()
+    const cameraReady = await startCamera()
+
+    await locationAndWatchPromise
+
+    if (!cameraReady) {
+      disableArMode()
+    }
+  } finally {
+    isRequestingArAccess.value = false
+  }
+}
+
+async function enableArMode() {
+  if (!import.meta.client) {
+    return
+  }
+
+  isArMode.value = true
+  sheetDragY.value = 0
+  await loadCampusBuildings()
+  await requestArAccess()
+}
+
+function disableArMode() {
+  isArMode.value = false
+  sheetDragY.value = 0
+  stopCampusAr()
+  stopCamera()
+}
+
+async function toggleArMode() {
+  if (isArMode.value) {
+    disableArMode()
+    return
+  }
+
+  await enableArMode()
 }
 
 // Questa funzione gestisce l'invio del form della chat.
@@ -491,6 +675,7 @@ async function submitChat() {
 }
 
 onMounted(() => {
+  loadCampusBuildings()
   nextTick(handleChatScroll)
   window.addEventListener('resize', handleChatScroll)
 })
@@ -499,7 +684,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleChatScroll)
   stopMicrophone()
-  stopCamera()
+  disableArMode()
 
   // Ripristina lo scroll nel caso il componente venga chiuso mentre il menu e aperto.
   if (import.meta.client) {
@@ -518,6 +703,17 @@ onBeforeUnmount(() => {
       muted 
       class="ar-camera-view transition-opacity duration-[800ms] pointer-events-none"
       :class="isArMode ? 'opacity-100' : 'opacity-0'" 
+    />
+    <CampusArOverlay
+      :enabled="isArMode"
+      :markers="arMarkers"
+      :primary-marker="primaryArMarker"
+      :sensor-status="arStatus"
+      :camera-permission-state="cameraPermissionState"
+      :building-source-label="arBuildingSource"
+      :is-loading-buildings="isArBuildingsLoading"
+      :is-requesting-access="isRequestingArAccess"
+      @request-access="requestArAccess"
     />
 
     <!-- Gradienti atmosferici originali -->

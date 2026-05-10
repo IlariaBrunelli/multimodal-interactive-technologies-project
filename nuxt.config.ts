@@ -9,37 +9,6 @@ export default defineNuxtConfig({
       autoprefixer: {},
     },
   },
-  modules: ['@vite-pwa/nuxt'],
-  pwa: {
-    registerType: 'autoUpdate',
-    manifest: {
-      name: 'Mita Fida',
-      short_name: 'MitaFida',
-      theme_color: '#ffffff',
-      display: 'standalone',
-      icons: [
-        {
-          src: '/pwa-192x192.png',
-          sizes: '192x192',
-          type: 'image/png',
-          purpose: 'any maskable'
-        },
-        {
-          src: '/pwa-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any maskable'
-        }
-      ]
-    },
-    workbox: {
-      globPatterns: ['**/*.{js,css,html,png,svg,ico}']
-    },
-    devOptions: {
-      enabled: true,
-      type: 'module',
-    },
-  },
 
   runtimeConfig: {
     n8nCampusChatWebhook: process.env.N8N_CAMPUS_CHAT_WEBHOOK || '',
