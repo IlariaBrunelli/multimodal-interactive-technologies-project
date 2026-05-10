@@ -16,17 +16,11 @@ const emit = defineEmits<{
   requestAccess: []
 }>()
 
-const permissionSummary = computed(() => [
-  { label: 'Camera', value: props.cameraPermissionState },
-  { label: 'Location', value: props.sensorStatus.locationPermissionState },
-  { label: 'Compass', value: props.sensorStatus.orientationPermissionState }
-])
-
 const emptyState = computed(() => {
   if (props.isLoadingBuildings) {
     return {
       title: 'Loading building anchors',
-      detail: `Source: ${props.buildingSourceLabel}`
+      detail: 'Reading mapped buildings...'
     }
   }
 
@@ -91,30 +85,6 @@ function shouldShowAccessButton() {
 
 <template>
   <div v-if="enabled" class="campus-ar-overlay">
-    <div class="ar-hud">
-      <div class="ar-source-pill">
-        {{ buildingSourceLabel }}
-      </div>
-
-      <div class="ar-permission-row">
-        <div
-          v-for="entry in permissionSummary"
-          :key="entry.label"
-          class="ar-status-pill"
-          :class="`ar-status-pill--${entry.value}`"
-        >
-          <span>{{ entry.label }}</span>
-          <strong>{{ formatPermissionLabel(entry.value) }}</strong>
-        </div>
-      </div>
-
-      <div class="ar-metrics">
-        <span v-if="sensorStatus.heading !== null">Heading {{ formatBearing(sensorStatus.heading) }}</span>
-        <span v-if="sensorStatus.pitch !== null">Pitch {{ Math.round(sensorStatus.pitch) }}°</span>
-        <span v-if="sensorStatus.locationAccuracyMeters !== null">Accuracy {{ Math.round(sensorStatus.locationAccuracyMeters) }} m</span>
-      </div>
-    </div>
-
     <div
       v-for="marker in markers"
       :key="marker.id"
@@ -167,18 +137,7 @@ function shouldShowAccessButton() {
   pointer-events: none;
 }
 
-.ar-hud {
-  position: absolute;
-  top: 24px;
-  right: 24px;
-  display: grid;
-  justify-items: end;
-  gap: 10px;
-  max-width: min(360px, calc(100vw - 40px));
-}
-
-.ar-source-pill,
-.ar-status-pill,
+.ar-marker-label,
 .ar-primary-card,
 .ar-empty-state,
 .ar-error-banner {
@@ -186,60 +145,6 @@ function shouldShowAccessButton() {
   background: rgba(15, 23, 42, 0.74);
   color: #f8fafc;
   backdrop-filter: blur(18px);
-}
-
-.ar-source-pill {
-  padding: 8px 12px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  letter-spacing: 0;
-}
-
-.ar-permission-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.ar-status-pill {
-  min-width: 94px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  display: grid;
-  gap: 2px;
-  font-size: 0.75rem;
-}
-
-.ar-status-pill strong {
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.ar-status-pill--granted {
-  border-color: rgba(34, 197, 94, 0.35);
-}
-
-.ar-status-pill--denied {
-  border-color: rgba(248, 113, 113, 0.4);
-}
-
-.ar-status-pill--prompt,
-.ar-status-pill--idle {
-  border-color: rgba(250, 204, 21, 0.35);
-}
-
-.ar-status-pill--unsupported {
-  border-color: rgba(148, 163, 184, 0.35);
-}
-
-.ar-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px 12px;
-  color: rgba(248, 250, 252, 0.88);
-  font-size: 0.78rem;
 }
 
 .ar-marker {
@@ -266,9 +171,6 @@ function shouldShowAccessButton() {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(15, 23, 42, 0.74);
-  color: #f8fafc;
-  backdrop-filter: blur(12px);
   min-width: 116px;
 }
 
@@ -316,7 +218,7 @@ function shouldShowAccessButton() {
 .ar-primary-card {
   position: absolute;
   left: 24px;
-  bottom: max(220px, 28vh);
+  bottom: max(340px, 42vh);
   width: min(240px, calc(100vw - 36px));
   padding: 12px 14px;
   border-radius: 12px;
@@ -354,29 +256,11 @@ function shouldShowAccessButton() {
 }
 
 @media (max-width: 640px) {
-  .ar-hud {
-    left: 12px;
-    right: 12px;
-    top: 12px;
-    justify-items: stretch;
-    max-width: none;
-  }
-
-  .ar-permission-row,
-  .ar-metrics {
-    justify-content: flex-start;
-  }
-
-  .ar-status-pill {
-    min-width: 0;
-    flex: 1 1 96px;
-  }
-
   .ar-primary-card {
     left: 12px;
     right: 12px;
     width: auto;
-    bottom: max(208px, 30vh);
+    bottom: max(360px, 44vh);
   }
 
   .ar-error-banner {
