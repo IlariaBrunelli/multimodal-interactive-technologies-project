@@ -51,7 +51,9 @@ type DeviceMotionPermissionApi = typeof DeviceMotionEvent & {
 }
 
 const DEFAULT_HORIZONTAL_FOV = 58
-const MAX_VISIBLE_DISTANCE_METERS = 5000
+const MAX_VISIBLE_DISTANCE_METERS = 160
+const MARKER_ALTITUDE_OFFSET_METERS = 25
+const SENSOR_PERMISSION_TIMEOUT_MS = 10000
 
 export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>) {
   const buildings = computed(() => toValue(buildingsSource))
@@ -72,6 +74,25 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
   let locationWatchId: number | null = null
   let orientationListenerAttached = false
   let resizeListenerAttached = false
+
+  async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          timeoutId = window.setTimeout(() => {
+            reject(new Error(timeoutMessage))
+          }, timeoutMs)
+        })
+      ])
+    } finally {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }
 
   function normalizeAngle(value: number) {
     return (value % 360 + 360) % 360
@@ -145,7 +166,9 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
 
   function computeElevationDegrees(from: GeoFix, target: CampusBuilding, distanceMeters: number) {
     const userAltitude = from.altitude ?? target.altitude ?? 0
-    const targetAltitude = (target.altitude ?? userAltitude) + (target.labelAltitude ?? 12)
+    // Keep markers above ground level so nearby buildings sit closer to eye height in AR.
+    const targetAltitude =
+      (target.altitude ?? userAltitude) + (target.labelAltitude ?? 12) + MARKER_ALTITUDE_OFFSET_METERS
 
     if (distanceMeters < 1) {
       return 0
@@ -279,9 +302,17 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
       try {
         const motionResult =
           typeof motionApi?.requestPermission === 'function'
-            ? await motionApi.requestPermission()
+            ? await withTimeout(
+                motionApi.requestPermission(),
+                SENSOR_PERMISSION_TIMEOUT_MS,
+                'Motion permission request timed out.'
+              )
             : 'granted'
-        const orientationResult = await orientationApi.requestPermission(true)
+        const orientationResult = await withTimeout(
+          orientationApi.requestPermission(true),
+          SENSOR_PERMISSION_TIMEOUT_MS,
+          'Compass permission request timed out.'
+        )
 
         orientationPermissionState.value =
           motionResult === 'granted' && orientationResult === 'granted' ? 'granted' : 'denied'
@@ -290,11 +321,13 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
           errorMessage.value = 'Motion and compass permission was denied.'
         }
       } catch (error) {
-        orientationPermissionState.value = 'denied'
+        orientationPermissionState.value = 'idle'
         errorMessage.value =
           error instanceof DOMException && error.name === 'NotAllowedError'
             ? 'Motion and compass permission was denied.'
-            : 'Unable to start motion and compass sensors.'
+            : error instanceof Error
+              ? error.message
+              : 'Unable to start motion and compass sensors.'
       }
 
       return

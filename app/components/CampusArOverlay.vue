@@ -8,6 +8,7 @@ const props = defineProps<{
   sensorStatus: CampusArStatus
   cameraPermissionState: ArPermissionState
   buildingSourceLabel: string
+  hasBuildings: boolean
   isLoadingBuildings: boolean
   isRequestingAccess?: boolean
 }>()
@@ -17,17 +18,17 @@ const emit = defineEmits<{
 }>()
 
 const emptyState = computed(() => {
-  if (props.isLoadingBuildings) {
-    return {
-      title: 'Loading building anchors',
-      detail: 'Reading mapped buildings...'
-    }
-  }
-
   if (props.cameraPermissionState === 'denied') {
     return {
       title: 'Camera access is blocked',
       detail: 'Allow camera access to use the outdoor AR overlay.'
+    }
+  }
+
+  if (props.cameraPermissionState !== 'granted') {
+    return {
+      title: 'Starting camera',
+      detail: 'Allow camera access to open the live AR view.'
     }
   }
 
@@ -38,6 +39,16 @@ const emptyState = computed(() => {
     }
   }
 
+  if (
+    props.sensorStatus.locationPermissionState !== 'granted' ||
+    props.sensorStatus.locationAccuracyMeters === null
+  ) {
+    return {
+      title: 'Locating you',
+      detail: 'Allow precise location and wait a moment for the first GPS fix.'
+    }
+  }
+
   if (props.sensorStatus.orientationPermissionState === 'denied') {
     return {
       title: 'Motion access is blocked',
@@ -45,10 +56,34 @@ const emptyState = computed(() => {
     }
   }
 
+  if (
+    props.sensorStatus.orientationPermissionState !== 'granted' ||
+    props.sensorStatus.heading === null
+  ) {
+    return {
+      title: 'Calibrating compass',
+      detail: 'Move the phone slightly so the AR overlay can align with nearby buildings.'
+    }
+  }
+
+  if (props.isLoadingBuildings) {
+    return {
+      title: 'Loading building anchors',
+      detail: 'Reading mapped buildings...'
+    }
+  }
+
+  if (!props.hasBuildings) {
+    return {
+      title: 'No building dataset available',
+      detail: 'Load building rows from Supabase before using the outdoor AR overlay.'
+    }
+  }
+
   if (props.markers.length === 0) {
     return {
       title: 'No building anchor in view',
-      detail: 'Move closer to a mapped building or replace the demo coordinates with your campus dataset.'
+      detail: 'Move closer to a mapped building within 160 meters or verify the Supabase building coordinates.'
     }
   }
 

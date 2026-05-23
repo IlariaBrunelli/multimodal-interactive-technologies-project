@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ArPermissionState } from '~/composables/useCampusAr'
-import { demoCampusBuildings, type CampusBuilding } from '~/data/campusBuildings'
+import type { CampusBuilding } from '~/data/campusBuildings'
 import { useCampusAr } from '~/composables/useCampusAr'
 
 // In Nuxt/Vue, <script setup> rende disponibili variabili e funzioni direttamente nel template.
@@ -166,9 +166,10 @@ const videoElement = ref<HTMLVideoElement | null>(null)
 let cameraStream: MediaStream | null = null
 const cameraPermissionState = ref<ArPermissionState>('idle')
 const isRequestingArAccess = ref(false)
-const arBuildings = ref<CampusBuilding[]>(demoCampusBuildings)
-const arBuildingSource = ref('Local demo dataset')
+const arBuildings = ref<CampusBuilding[]>([])
+const arBuildingSource = ref('No building dataset loaded')
 const isArBuildingsLoading = ref(false)
+const CAMERA_PERMISSION_TIMEOUT_MS = 10000
 const {
   markers: arMarkers,
   primaryMarker: primaryArMarker,
@@ -253,17 +254,26 @@ function toggleExpand() {
   // Serve per evitare errori lato server, dove document non esiste.
   if (import.meta.client) {
     // Se il menu e aperto blocchiamo lo scroll della pagina; se e chiuso lo riattiviamo.
-    document.body.style.overflow = isExpanded.value ? 'hidden' : 'hidden'
+    document.body.style.overflow = isExpanded.value ? 'hidden' : 'auto'
   }
 }
 
 // Questa funzione riceve il bottone cliccato.
 // button: MenuButton significa che il parametro deve avere la forma definita sopra.
-function goToPage(button: MenuButton) {
+async function goToPage(button: MenuButton) {
   // Anche qui controlliamo di essere nel browser, perche window esiste solo lato client.
+  if (!import.meta.client) {
+    return
+  }
+
+  if (button.link === '/microwaves') {
+    isExpanded.value = false
+    document.body.style.overflow = 'auto'
+    await navigateTo(button.link)
+    return
+  }
+
   if (import.meta.client) {
-    // Per ora mostra un alert invece di fare una vera navigazione.
-    // Template literal: con `...${button.link}...` inseriamo il valore della variabile nella stringa.
     window.alert(`Navigo a: ${button.link}`)
   }
 }
@@ -508,6 +518,7 @@ async function loadCampusBuildings() {
 
   try {
     for (const source of [
+      { tableName: 'building', label: 'Supabase building' },
       { tableName: 'buildings', label: 'Supabase buildings' },
       { tableName: 'campus_buildings', label: 'Supabase campus_buildings' }
     ]) {
@@ -527,24 +538,61 @@ async function loadCampusBuildings() {
     isArBuildingsLoading.value = false
   }
 
-  arBuildings.value = demoCampusBuildings
-  arBuildingSource.value = 'Local demo dataset'
+  arBuildings.value = []
+  arBuildingSource.value = 'No Supabase building dataset available'
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error(timeoutMessage))
+        }, timeoutMs)
+      })
+    ])
+  } finally {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId)
+    }
+  }
 }
 
 async function startCamera() {
   if (!import.meta.client || !videoElement.value) return false
 
+  if (
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== 'function'
+  ) {
+    cameraPermissionState.value = 'unsupported'
+    alert('Camera access is not available on this device or browser.')
+    return false
+  }
+
+  if (cameraStream) {
+    cameraPermissionState.value = 'granted'
+    return true
+  }
+
   cameraPermissionState.value = 'prompt'
 
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: {
-          ideal: 'environment'
+    cameraStream = await withTimeout(
+      navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: {
+            ideal: 'environment'
+          }
         }
-      }
-    })
+      }),
+      CAMERA_PERMISSION_TIMEOUT_MS,
+      'Camera permission request timed out.'
+    )
     videoElement.value.srcObject = cameraStream
     await videoElement.value.play().catch(() => undefined)
     cameraPermissionState.value = 'granted'
@@ -553,7 +601,11 @@ async function startCamera() {
     console.error('Camera access error:', error)
     cameraPermissionState.value = 'denied'
     isArMode.value = false
-    alert('Unable to access camera. Please check browser permissions.')
+    alert(
+      error instanceof Error
+        ? error.message
+        : 'Unable to access camera. Please check browser permissions.'
+    )
     return false
   }
 }
@@ -576,14 +628,14 @@ async function requestArAccess() {
   isRequestingArAccess.value = true
 
   try {
-    const locationAndWatchPromise = startCampusAr()
     const cameraReady = await startCamera()
-
-    await locationAndWatchPromise
 
     if (!cameraReady) {
       disableArMode()
+      return
     }
+
+    await startCampusAr()
   } finally {
     isRequestingArAccess.value = false
   }
@@ -596,8 +648,9 @@ async function enableArMode() {
 
   isArMode.value = true
   sheetDragY.value = 0
-  await loadCampusBuildings()
+  const buildingLoadPromise = loadCampusBuildings()
   await requestArAccess()
+  await buildingLoadPromise
 }
 
 function disableArMode() {
@@ -711,6 +764,7 @@ onBeforeUnmount(() => {
       :sensor-status="arStatus"
       :camera-permission-state="cameraPermissionState"
       :building-source-label="arBuildingSource"
+      :has-buildings="arBuildings.length > 0"
       :is-loading-buildings="isArBuildingsLoading"
       :is-requesting-access="isRequestingArAccess"
       @request-access="requestArAccess"
