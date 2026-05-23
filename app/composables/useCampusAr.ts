@@ -76,7 +76,7 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
   let resizeListenerAttached = false
 
   async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let timeoutId: number | null = null
 
     try {
       return await Promise.race([

@@ -588,7 +588,7 @@ async function loadArBuildingHistoricalDetails(buildingId: string) {
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  let timeoutId: number | null = null
 
   try {
     return await Promise.race([
@@ -851,7 +851,7 @@ onBeforeUnmount(() => {
             transformOrigin: 'top center'
           }"
         >
-          <h1>PolInSight</h1>
+          <h1>PolinSight</h1>
           <p class="hero-copy">
             Welcome to your Polimi campus companion.
           </p>
