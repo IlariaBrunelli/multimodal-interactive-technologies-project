@@ -11,10 +11,15 @@ const props = defineProps<{
   hasBuildings: boolean
   isLoadingBuildings: boolean
   isRequestingAccess?: boolean
+  selectedBuildingId?: string | null
+  buildingHistoricalDetails?: string | null
+  isLoadingBuildingDetails?: boolean
+  buildingDetailsError?: string | null
 }>()
 
 const emit = defineEmits<{
   requestAccess: []
+  requestBuildingDetails: [buildingId: string]
 }>()
 
 const emptyState = computed(() => {
@@ -116,6 +121,10 @@ function shouldShowAccessButton() {
     props.sensorStatus.orientationPermissionState !== 'granted'
   )
 }
+
+function shouldShowPrimaryDetails() {
+  return props.primaryMarker?.id === props.selectedBuildingId
+}
 </script>
 
 <template>
@@ -152,11 +161,27 @@ function shouldShowAccessButton() {
       </button>
     </div>
 
-    <div v-if="primaryMarker" class="ar-primary-card">
+    <button
+      v-if="primaryMarker"
+      type="button"
+      class="ar-primary-card"
+      @click="emit('requestBuildingDetails', primaryMarker.id)"
+    >
       <strong>{{ primaryMarker.name }}</strong>
       <span>{{ Math.round(primaryMarker.distanceMeters) }} m away</span>
       <span>Bearing {{ formatBearing(primaryMarker.bearing) }}</span>
-    </div>
+      <span v-if="!shouldShowPrimaryDetails()" class="ar-primary-hint">Tap for details</span>
+      <span v-else-if="isLoadingBuildingDetails" class="ar-primary-hint">Loading details...</span>
+      <span v-else-if="buildingDetailsError" class="ar-primary-detail ar-primary-detail--error">
+        {{ buildingDetailsError }}
+      </span>
+      <span v-else-if="buildingHistoricalDetails" class="ar-primary-detail">
+        {{ buildingHistoricalDetails }}
+      </span>
+      <span v-else class="ar-primary-detail">
+        No historical details available for this building.
+      </span>
+    </button>
 
     <div v-if="sensorStatus.errorMessage" class="ar-error-banner">
       {{ sensorStatus.errorMessage }}
@@ -254,11 +279,37 @@ function shouldShowAccessButton() {
   position: absolute;
   left: 24px;
   bottom: max(340px, 42vh);
-  width: min(240px, calc(100vw - 36px));
+  width: min(320px, calc(100vw - 36px));
   padding: 12px 14px;
   border-radius: 12px;
   display: grid;
   gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: left;
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ar-primary-hint {
+  margin-top: 4px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: rgba(248, 250, 252, 0.82);
+}
+
+.ar-primary-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(248, 250, 252, 0.94);
+  max-height: 170px;
+  overflow-y: auto;
+}
+
+.ar-primary-detail--error {
+  color: #fecaca;
 }
 
 .ar-access-button {

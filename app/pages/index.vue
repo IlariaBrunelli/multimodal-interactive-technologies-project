@@ -52,6 +52,10 @@ type CampusBuildingRow = {
   color?: string | null
 }
 
+type BuildingHistoricalDetailsRow = {
+  historical_details?: string | null
+}
+
 // Tipo minimo per usare la Web Speech API senza importare librerie esterne.
 type BrowserSpeechRecognitionResult = {
   readonly [index: number]: { transcript: string } | undefined
@@ -168,7 +172,12 @@ const cameraPermissionState = ref<ArPermissionState>('idle')
 const isRequestingArAccess = ref(false)
 const arBuildings = ref<CampusBuilding[]>([])
 const arBuildingSource = ref('No building dataset loaded')
+const arBuildingTableName = ref<string | null>(null)
 const isArBuildingsLoading = ref(false)
+const selectedArBuildingId = ref<string | null>(null)
+const selectedArBuildingHistoricalDetails = ref<string | null>(null)
+const isLoadingArBuildingDetails = ref(false)
+const arBuildingDetailsError = ref<string | null>(null)
 const CAMERA_PERMISSION_TIMEOUT_MS = 10000
 const {
   markers: arMarkers,
@@ -528,6 +537,7 @@ async function loadCampusBuildings() {
         if (mappedBuildings.length > 0) {
           arBuildings.value = mappedBuildings
           arBuildingSource.value = source.label
+          arBuildingTableName.value = source.tableName
           return
         }
       } catch (error) {
@@ -540,6 +550,41 @@ async function loadCampusBuildings() {
 
   arBuildings.value = []
   arBuildingSource.value = 'No Supabase building dataset available'
+  arBuildingTableName.value = null
+}
+
+async function loadArBuildingHistoricalDetails(buildingId: string) {
+  selectedArBuildingId.value = buildingId
+  selectedArBuildingHistoricalDetails.value = null
+  arBuildingDetailsError.value = null
+
+  if (!arBuildingTableName.value) {
+    arBuildingDetailsError.value = 'Building data is still loading.'
+    return
+  }
+
+  isLoadingArBuildingDetails.value = true
+
+  try {
+    const supabase = useSupabaseClient()
+    const { data, error } = await supabase
+      .from(arBuildingTableName.value)
+      .select('historical_details')
+      .eq('id', buildingId)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    const details = (data as BuildingHistoricalDetailsRow | null)?.historical_details?.trim()
+    selectedArBuildingHistoricalDetails.value = details || null
+  } catch (error) {
+    console.warn('Unable to load building historical details.', error)
+    arBuildingDetailsError.value = 'Unable to load building details.'
+  } finally {
+    isLoadingArBuildingDetails.value = false
+  }
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
@@ -656,6 +701,9 @@ async function enableArMode() {
 function disableArMode() {
   isArMode.value = false
   sheetDragY.value = 0
+  selectedArBuildingId.value = null
+  selectedArBuildingHistoricalDetails.value = null
+  arBuildingDetailsError.value = null
   stopCampusAr()
   stopCamera()
 }
@@ -767,7 +815,12 @@ onBeforeUnmount(() => {
       :has-buildings="arBuildings.length > 0"
       :is-loading-buildings="isArBuildingsLoading"
       :is-requesting-access="isRequestingArAccess"
+      :selected-building-id="selectedArBuildingId"
+      :building-historical-details="selectedArBuildingHistoricalDetails"
+      :is-loading-building-details="isLoadingArBuildingDetails"
+      :building-details-error="arBuildingDetailsError"
       @request-access="requestArAccess"
+      @request-building-details="loadArBuildingHistoricalDetails"
     />
 
     <!-- Gradienti atmosferici originali -->
@@ -792,15 +845,19 @@ onBeforeUnmount(() => {
           ]"
           :style="{ 
             opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 2), 
-            height: isArMode ? '0px' : `${(1 - sheetProgress) * 76}px`,
+            height: isArMode ? '0px' : `${(1 - sheetProgress) * 132}px`,
             transform: isArMode ? 'translateY(-20px)' : `scale(${1 - sheetProgress * 0.1})`,
             overflow: 'hidden',
             transformOrigin: 'top center'
           }"
         >
-          <h1>AR Experience</h1>
+          <h1>PolInSight</h1>
           <p class="hero-copy">
-            You can use AR mode for an immersive experience
+            Welcome to your Polimi campus companion.
+          </p>
+          <p class="hero-section-title">AR Experience</p>
+          <p class="hero-copy hero-copy-compact">
+            Look through the camera to find nearby buildings and ask for useful insights.
           </p>
         </div>
         
@@ -1180,10 +1237,24 @@ onBeforeUnmount(() => {
 
 .hero-copy {
   max-width: 520px;
-  margin: 10px auto 14px;
+  margin: 10px auto 12px;
   font-size: 0.9rem; /* reduced size */
   line-height: 1.5;
   color: #475569;
+}
+
+.hero-section-title {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #102C53;
+}
+
+.hero-copy-compact {
+  margin: 6px auto 14px;
+  font-size: 0.84rem;
 }
 
 .hero-button {
