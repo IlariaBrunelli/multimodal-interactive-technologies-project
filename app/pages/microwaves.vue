@@ -41,6 +41,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function isMicrowaveRow(value: Record<string, unknown>) {
+  return 'id' in value || 'building_id' in value || 'buildingId' in value
+}
+
 function readValue(record: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     if (key in record) {
@@ -113,16 +117,36 @@ function extractMicrowaveRows(value: unknown): MicrowaveRow[] {
     return []
   }
 
-  if ('id' in value || 'building_id' in value || 'buildingId' in value) {
-    return [value]
-  }
-
   for (const key of ['microwaves', 'data', 'items', 'result', 'rows', 'json', 'body', 'text', 'output']) {
     const rows = extractMicrowaveRows(value[key])
 
     if (rows.length > 0) {
       return rows
     }
+  }
+
+  const nestedRows = Object.values(value).flatMap((nestedValue) => {
+    if (Array.isArray(nestedValue)) {
+      return extractMicrowaveRows(nestedValue)
+    }
+
+    if (isRecord(nestedValue) && isMicrowaveRow(nestedValue)) {
+      return [nestedValue]
+    }
+
+    if (typeof nestedValue === 'string' && nestedValue.trim().startsWith('[')) {
+      return extractMicrowaveRows(nestedValue)
+    }
+
+    return []
+  })
+
+  if (nestedRows.length > 0) {
+    return nestedRows
+  }
+
+  if (isMicrowaveRow(value)) {
+    return [value]
   }
 
   return []
