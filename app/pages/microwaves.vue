@@ -375,6 +375,11 @@ watch(userPosition, (position) => {
 })
 
 onMounted(() => {
+  if (import.meta.client) {
+    document.documentElement.style.overflow = 'auto'
+    document.body.style.overflow = 'auto'
+  }
+
   startLocationWatch()
 })
 
@@ -384,9 +389,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="min-h-screen bg-slate-50 text-slate-950">
-    <section class="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 sm:px-6 lg:px-8">
-      <header class="border-b border-slate-200 pb-5">
+  <main class="h-dvh overflow-y-auto bg-slate-50 text-slate-950">
+    <section class="mx-auto flex min-h-full max-w-6xl flex-col px-4 py-6 sm:px-6 lg:px-8">
+      <header class="shrink-0 border-b border-slate-200 pb-5">
         <NuxtLink
           to="/"
           class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
@@ -424,7 +429,7 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <section class="mt-6 grid gap-3 sm:grid-cols-3">
+      <section class="mt-6 grid shrink-0 gap-3 sm:grid-cols-3">
         <div class="rounded-lg border border-slate-200 bg-white p-4">
           <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Microwaves</p>
           <p class="mt-2 text-2xl font-semibold text-slate-950">{{ microwaveItems.length }}</p>
@@ -448,12 +453,12 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-500">
+      <section class="mt-4 flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-500">
         <p>Last refresh: {{ lastUpdatedLabel }}</p>
         <p v-if="userPosition">Coordinates: {{ formatCoordinates(userPosition.latitude, userPosition.longitude) }}</p>
       </section>
 
-      <section class="mt-6 flex-1">
+      <section class="mt-6 min-h-0 flex-1 pb-8">
         <div v-if="isLoading" class="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
           Loading ranked microwaves...
         </div>
@@ -479,10 +484,15 @@ onBeforeUnmount(() => {
           No microwaves were returned for this location.
         </div>
 
-        <div v-else class="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div class="overflow-x-auto">
+        <div v-else class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+            <span>Showing all {{ microwaveItems.length }} returned microwaves</span>
+            <span v-if="nearestMicrowave">Nearest: {{ formatDistance(nearestMicrowave.distanceMeters) }}</span>
+          </div>
+
+          <div class="max-h-[65dvh] overflow-auto">
             <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead class="bg-slate-100 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <thead class="sticky top-0 z-10 bg-slate-100 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <tr>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Rank</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Microwave ID</th>
@@ -495,7 +505,7 @@ onBeforeUnmount(() => {
               <tbody class="divide-y divide-slate-200">
                 <tr
                   v-for="microwave in microwaveItems"
-                  :key="microwave.id"
+                  :key="`${microwave.id}-${microwave.rank}`"
                   class="align-top transition hover:bg-orange-50/60"
                 >
                   <td class="whitespace-nowrap px-4 py-4 font-semibold text-orange-700">
@@ -522,3 +532,12 @@ onBeforeUnmount(() => {
     </section>
   </main>
 </template>
+
+<style scoped>
+:global(html),
+:global(body) {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}
+</style>
