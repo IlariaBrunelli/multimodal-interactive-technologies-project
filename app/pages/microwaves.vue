@@ -29,15 +29,10 @@ const nearestMicrowavesEndpoint = 'http://localhost:5678/webhook/get-campus-data
 const locationState = ref<LocationState>('idle')
 const locationError = ref<string | null>(null)
 const userPosition = ref<UserPosition | null>(null)
+const microwaves = ref<MicrowaveRow[]>([])
+const isLoading = ref(false)
 const fetchErrorMessage = ref<string | null>(null)
 const lastUpdatedAt = ref<number | null>(null)
-const nearestMicrowavesRequestBody = ref<NearestMicrowavesRequestBody>({
-  action: 'get_nearest_microwaves',
-  data: JSON.stringify({
-    longitude: '',
-    latitude: ''
-  })
-})
 
 let locationWatchId: number | null = null
 let lastRequestedPositionKey = ''
@@ -260,19 +255,6 @@ function startLocationWatch() {
   )
 }
 
-const {
-  data: microwaves,
-  pending: isLoading,
-  error: fetchError,
-  execute: executeMicrowavesFetch
-} = useFetch<unknown>(nearestMicrowavesEndpoint, {
-  method: 'POST',
-  body: nearestMicrowavesRequestBody,
-  immediate: false,
-  server: false,
-  watch: false
-})
-
 async function loadNearestMicrowaves() {
   if (!userPosition.value) {
     fetchErrorMessage.value = 'Allow location access before loading microwaves.'
@@ -284,8 +266,13 @@ async function loadNearestMicrowaves() {
     return
   }
 
+  if (isLoading.value) {
+    return
+  }
+
+  isLoading.value = true
   fetchErrorMessage.value = null
-  nearestMicrowavesRequestBody.value = {
+  const requestBody: NearestMicrowavesRequestBody = {
     action: 'get_nearest_microwaves',
     data: JSON.stringify({
       longitude: userPosition.value.longitude,
@@ -293,17 +280,22 @@ async function loadNearestMicrowaves() {
     })
   }
 
-  await executeMicrowavesFetch()
+  try {
+    const response = await $fetch<unknown>(nearestMicrowavesEndpoint, {
+      method: 'POST',
+      body: requestBody
+    })
 
-  if (fetchError.value) {
+    microwaves.value = extractMicrowaveRows(response)
+    lastUpdatedAt.value = Date.now()
+  } catch (error) {
     fetchErrorMessage.value = extractErrorMessage(
-      fetchError.value,
+      error,
       'Unable to load microwaves from the campus webhook.'
     )
-    return
+  } finally {
+    isLoading.value = false
   }
-
-  lastUpdatedAt.value = Date.now()
 }
 
 function refreshLocation() {
@@ -311,16 +303,12 @@ function refreshLocation() {
 }
 
 const microwaveItems = computed(() => {
-  return extractMicrowaveRows(microwaves.value).map(mapMicrowaveRow)
+  return microwaves.value.map(mapMicrowaveRow)
 })
 const nearestMicrowave = computed(() => microwaveItems.value[0] ?? null)
 const loadError = computed(() => {
   if (fetchErrorMessage.value) {
     return fetchErrorMessage.value
-  }
-
-  if (fetchError.value) {
-    return extractErrorMessage(fetchError.value, 'Unable to load microwaves from the campus webhook.')
   }
 
   return null
