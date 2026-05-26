@@ -109,6 +109,14 @@ const buttons = ref<MenuButton[]>([
     colorCollapsed: 'bg-white text-orange-500 border-orange-400 hover:bg-orange-50'
   },
   {
+    id: 5,
+    text: 'Water Fountains',
+    link: '/fountains',
+    iconPath: 'M7 4h10v3a5 5 0 0 1-10 0V4z M12 12v8 M9 20h6 M5 16h14 M8 9c.75 1.85 2.1 3 4 3s3.25-1.15 4-3',
+    colorExpanded: 'bg-sky-50 text-sky-600 border-sky-500 hover:bg-sky-100',
+    colorCollapsed: 'bg-white text-sky-500 border-sky-400 hover:bg-sky-50'
+  },
+  {
     id: 2,
     text: 'Plugs',
     link: '/plugs',
@@ -276,7 +284,7 @@ async function goToPage(button: MenuButton) {
     return
   }
 
-  if (button.link === '/microwaves') {
+  if (button.link === '/microwaves' || button.link === '/fountains') {
     isExpanded.value = false
     document.body.style.overflow = 'auto'
     await navigateTo(button.link)
@@ -951,17 +959,17 @@ onBeforeUnmount(() => {
                 class="transition-all duration-500 flex flex-col w-full"
                 :class="isExpanded ? 'flex-1 justify-start max-w-3xl mx-auto' : 'justify-start'"
               >
-                <div class="relative w-full" :style="{ height: isExpanded ? '190px' : '56px' }">
+                <div class="relative w-full" :style="{ height: isExpanded ? `${Math.ceil(buttons.length / 2) * 104 - 18}px` : '56px' }">
                   <button
                     v-for="(button, index) in buttons"
                     :key="button.id"
                     type="button"
                     class="absolute transition-all duration-500 flex items-center justify-center overflow-hidden group focus:outline-none border-2"
                     :style="{
-                      transitionDelay: isExpanded ? `${index * 60}ms` : `${(3 - index) * 30}ms`,
+                      transitionDelay: isExpanded ? `${index * 60}ms` : `${(buttons.length - 1 - index) * 30}ms`,
                       transitionTimingFunction: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
-                      top: isExpanded ? (index > 1 ? '104px' : '0px') : '0px',
-                      left: isExpanded ? (index % 2 === 1 ? 'calc(50% + 8px)' : '0px') : `calc((100% - 56px) / 3 * ${index})`,
+                      top: isExpanded ? `${Math.floor(index / 2) * 104}px` : '0px',
+                      left: isExpanded ? (index % 2 === 1 ? 'calc(50% + 8px)' : '0px') : `calc((100% - 56px) / ${buttons.length - 1} * ${index})`,
                       width: isExpanded ? 'calc(50% - 8px)' : '56px',
                       height: isExpanded ? '80px' : '56px',
                       borderRadius: isExpanded ? '1.5rem' : '50%'
@@ -978,7 +986,7 @@ onBeforeUnmount(() => {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       stroke-width="2.5"
-                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(3 - index) * 40 + 200}ms` }"
+                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(buttons.length - 1 - index) * 40 + 200}ms` }"
                       :class="isExpanded ? 'opacity-0 scale-50' : 'opacity-100 scale-100'"
                     >
                       <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
