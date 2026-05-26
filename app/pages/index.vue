@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ArPermissionState } from '~/composables/useCampusAr'
 import type { CampusBuilding } from '~/data/campusBuildings'
+import { getChatLocationCoordinates } from '~/composables/useChatLocation'
 import { useCampusAr } from '~/composables/useCampusAr'
 
 // In Nuxt/Vue, <script setup> rende disponibili variabili e funzioni direttamente nel template.
@@ -749,6 +750,7 @@ async function submitChat() {
     const supabase = useSupabaseClient()
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
+    const chatLocation = await getChatLocationCoordinates()
 
     const response = await $fetch<CampusChatResponse>('/api/campus-chat', {
       method: 'POST',
@@ -756,7 +758,9 @@ async function submitChat() {
       timeout: 600000, // 10 minutes timeout for slow local LLM responses
       body: {
         message: question,
-        sessionId: getCampusChatSessionId()
+        sessionId: getCampusChatSessionId(),
+        latitude: chatLocation.latitude,
+        longitude: chatLocation.longitude
       }
     })
 

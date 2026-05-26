@@ -100,15 +100,29 @@ function readNumberCandidate(record: Record<string, unknown>, keys: string[]) {
 }
 
 function extractMicrowaveRows(value: unknown): MicrowaveRow[] {
+  if (typeof value === 'string') {
+    try {
+      return extractMicrowaveRows(JSON.parse(value))
+    } catch {
+      return []
+    }
+  }
+
   if (Array.isArray(value)) {
-    return value.filter(isRecord)
+    return value
+      .flatMap((item) => extractMicrowaveRows(item))
+      .filter(isRecord)
   }
 
   if (!isRecord(value)) {
     return []
   }
 
-  for (const key of ['microwaves', 'data', 'items', 'result', 'rows']) {
+  if ('id' in value || 'building_id' in value || 'buildingId' in value) {
+    return [value]
+  }
+
+  for (const key of ['microwaves', 'data', 'items', 'result', 'rows', 'json', 'body', 'text', 'output']) {
     const rows = extractMicrowaveRows(value[key])
 
     if (rows.length > 0) {
@@ -147,6 +161,7 @@ function readDistanceMeters(row: MicrowaveRow) {
   return readNumberCandidate(row, [
     'distance_meters',
     'distanceMeters',
+    'distance_in_meter',
     'distance_in_meters',
     'distanceInMeters',
     'meters',

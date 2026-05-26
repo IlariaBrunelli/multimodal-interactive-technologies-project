@@ -1,3 +1,26 @@
+type CampusChatRequestBody = {
+  message?: string
+  sessionId?: string
+  latitude?: number | string | null
+  longitude?: number | string | null
+}
+
+function parseOptionalCoordinate(value: number | string | null | undefined) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const parsedValue = Number.parseFloat(value)
+
+    if (Number.isFinite(parsedValue)) {
+      return parsedValue
+    }
+  }
+
+  return null
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const webhookUrl = config.n8nCampusChatWebhook
@@ -9,8 +32,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody<{ message?: string; sessionId?: string }>(event)
+  const body = await readBody<CampusChatRequestBody>(event)
   const message = body?.message?.trim()
+  const latitude = parseOptionalCoordinate(body?.latitude)
+  const longitude = parseOptionalCoordinate(body?.longitude)
 
   if (!message) {
     throw createError({
@@ -34,7 +59,9 @@ export default defineEventHandler(async (event) => {
       timeout: 600000, // 10 minutes timeout for local LLMs like Ollama
       body: {
         message,
-        sessionId: body.sessionId
+        sessionId: body.sessionId,
+        latitude,
+        longitude
       }
     })
 

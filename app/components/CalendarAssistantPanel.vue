@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Session, User } from '@supabase/supabase-js'
 
+import { getChatLocationCoordinates } from '../composables/useChatLocation'
 import type { UserCalendarPreviewEvent, UserCalendarResponse } from '../utils/user-calendar'
 
 type ChatMessage = {
@@ -111,11 +112,9 @@ async function getAuthorizedHeaders() {
     currentSession.value = activeSession
   }
 
-  return {
-    Authorization: activeSession?.access_token
-      ? `Bearer ${activeSession.access_token}`
-      : undefined
-  }
+  return activeSession?.access_token
+    ? { Authorization: `Bearer ${activeSession.access_token}` }
+    : {}
 }
 
 async function loadLinkedCalendar() {
@@ -356,12 +355,16 @@ async function submitChat() {
   userPrompt.value = ''
 
   try {
+    const chatLocation = await getChatLocationCoordinates()
+
     const response = await $fetch<CampusChatResponse>('/api/campus-chat', {
       method: 'POST',
       headers,
       body: {
         message: question,
-        sessionId: getCampusChatSessionId()
+        sessionId: getCampusChatSessionId(),
+        latitude: chatLocation.latitude,
+        longitude: chatLocation.longitude
       }
     })
 
