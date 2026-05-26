@@ -12,8 +12,8 @@ type UserPosition = {
 type MicrowaveTableRow = {
   id: string
   rank: number
-  buildingId: string
   buildingName: string
+  buildingAlias: string
   floor: string
   notes: string
   distanceMeters: number | null
@@ -42,7 +42,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isMicrowaveRow(value: Record<string, unknown>) {
-  return 'id' in value || 'building_id' in value || 'buildingId' in value
+  return (
+    'id' in value ||
+    'building_id' in value ||
+    'buildingId' in value ||
+    ('name' in value && ('alias' in value || 'floor' in value || 'distance_in_meter' in value))
+  )
 }
 
 function readValue(record: Record<string, unknown>, keys: string[]) {
@@ -191,20 +196,20 @@ function readDistanceMeters(row: MicrowaveRow) {
 
 function mapMicrowaveRow(row: MicrowaveRow, index: number): MicrowaveTableRow {
   const nestedBuilding = readRecordCandidate(row, ['building', 'buildings'])
-  const buildingId =
-    readStringCandidate(row, ['building_id', 'buildingId', 'building_uuid', 'buildingUuid']) ??
-    (nestedBuilding ? readStringCandidate(nestedBuilding, ['id']) : null) ??
-    'Not provided'
   const buildingName =
-    readStringCandidate(row, ['building_name', 'buildingName']) ??
+    readStringCandidate(row, ['name', 'building_name', 'buildingName']) ??
     (nestedBuilding ? readStringCandidate(nestedBuilding, ['name', 'title', 'building_name']) : null) ??
     'Unknown building'
+  const buildingAlias =
+    readStringCandidate(row, ['alias', 'building_alias', 'buildingAlias']) ??
+    (nestedBuilding ? readStringCandidate(nestedBuilding, ['alias', 'building_alias', 'buildingAlias']) : null) ??
+    '-'
 
   return {
     id: readStringCandidate(row, ['id', 'microwave_id', 'microwaveId']) ?? `microwave-${index + 1}`,
     rank: index + 1,
-    buildingId,
     buildingName,
+    buildingAlias,
     floor: readStringCandidate(row, ['floor', 'level']) ?? '-',
     notes: readStringCandidate(row, ['notes', 'note', 'description']) ?? '-',
     distanceMeters: readDistanceMeters(row)
@@ -467,7 +472,7 @@ onBeforeUnmount(() => {
             {{ nearestMicrowave ? formatDistance(nearestMicrowave.distanceMeters) : '-' }}
           </p>
           <p class="mt-1 text-sm text-slate-600">
-            {{ nearestMicrowave ? nearestMicrowave.buildingName : 'No ranked microwaves yet' }}
+            {{ nearestMicrowave ? `${nearestMicrowave.buildingName} · ${nearestMicrowave.buildingAlias}` : 'No ranked microwaves yet' }}
           </p>
         </div>
 
@@ -520,8 +525,8 @@ onBeforeUnmount(() => {
               <thead class="sticky top-0 z-10 bg-slate-100 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <tr>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Rank</th>
-                  <th scope="col" class="whitespace-nowrap px-4 py-3">Microwave ID</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Building</th>
+                  <th scope="col" class="whitespace-nowrap px-4 py-3">Alias</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Floor</th>
                   <th scope="col" class="min-w-[220px] px-4 py-3">Notes</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3 text-right">Distance</th>
@@ -536,12 +541,11 @@ onBeforeUnmount(() => {
                   <td class="whitespace-nowrap px-4 py-4 font-semibold text-orange-700">
                     {{ microwave.rank }}
                   </td>
-                  <td class="px-4 py-4">
-                    <span class="break-all font-mono text-xs text-slate-700">{{ microwave.id }}</span>
+                  <td class="whitespace-nowrap px-4 py-4 font-medium text-slate-950">
+                    {{ microwave.buildingName }}
                   </td>
-                  <td class="px-4 py-4">
-                    <div class="font-medium text-slate-950">{{ microwave.buildingName }}</div>
-                    <div class="mt-1 break-all font-mono text-xs text-slate-500">{{ microwave.buildingId }}</div>
+                  <td class="px-4 py-4 text-slate-700">
+                    {{ microwave.buildingAlias }}
                   </td>
                   <td class="whitespace-nowrap px-4 py-4 text-slate-700">{{ microwave.floor }}</td>
                   <td class="px-4 py-4 text-slate-700">{{ microwave.notes }}</td>
