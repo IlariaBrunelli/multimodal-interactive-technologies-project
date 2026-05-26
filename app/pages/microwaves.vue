@@ -285,6 +285,7 @@ async function loadNearestMicrowaves() {
       method: 'POST',
       body: requestBody
     })
+    console.log(response)
 
     microwaves.value = extractMicrowaveRows(response)
     lastUpdatedAt.value = Date.now()

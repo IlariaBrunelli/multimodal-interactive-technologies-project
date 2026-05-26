@@ -20,13 +20,13 @@ export default defineNuxtConfig({
         '',
     },
   },
-  
+
   vite: {
     server: {
       allowedHosts: true
     }
   },
-  
+
   sourcemap: {
     server: false,
     client: false

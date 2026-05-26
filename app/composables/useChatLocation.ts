@@ -21,13 +21,14 @@ export function getChatLocationCoordinates() {
           longitude: position.coords.longitude
         })
       },
-      () => {
+      (error) => {
+        console.warn('Geolocation failed:', error.message)
         resolve(emptyChatLocation)
       },
       {
-        enableHighAccuracy: true,
-        maximumAge: 10000,
-        timeout: 8000
+        enableHighAccuracy: false,
+        maximumAge: 60000,
+        timeout: 15000
       }
     )
   })

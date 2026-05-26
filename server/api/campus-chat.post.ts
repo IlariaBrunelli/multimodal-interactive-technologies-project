@@ -52,6 +52,10 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const locationData = (latitude !== null && longitude !== null)
+      ? JSON.stringify({ user_long: longitude, user_lati: latitude })
+      : undefined
+
     // The webhook call will run on n8n and return an answer with the message content in a json with "text" string field
     const n8nResponse = await $fetch<{ text: string }>(webhookUrl, {
       method: 'POST',
@@ -61,7 +65,8 @@ export default defineEventHandler(async (event) => {
         message,
         sessionId: body.sessionId,
         latitude,
-        longitude
+        longitude,
+        locationData
       }
     })
 
