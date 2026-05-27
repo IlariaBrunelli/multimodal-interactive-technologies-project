@@ -57,6 +57,28 @@ type BuildingHistoricalDetailsRow = {
   historical_details?: string | null
 }
 
+type GuidedTourRow = CampusBuildingRow & {
+  id?: string | number | null
+  building_id?: string | number | null
+  description?: string | null
+  storytelling?: string | null
+  step?: number | string | null
+  building?: CampusBuildingRow | null
+  buildings?: CampusBuildingRow | null
+  campus_buildings?: CampusBuildingRow | null
+}
+
+type GuidedTourStep = {
+  id: string
+  order: number
+  storytelling: string | null
+  building: CampusBuilding
+}
+
+type GuidedTourStepsResponse = {
+  steps?: GuidedTourRow[]
+}
+
 // Tipo minimo per usare la Web Speech API senza importare librerie esterne.
 type BrowserSpeechRecognitionResult = {
   readonly [index: number]: { transcript: string } | undefined
@@ -188,13 +210,47 @@ const selectedArBuildingHistoricalDetails = ref<string | null>(null)
 const isLoadingArBuildingDetails = ref(false)
 const arBuildingDetailsError = ref<string | null>(null)
 const CAMERA_PERMISSION_TIMEOUT_MS = 10000
+const GUIDED_TOUR_COMPLETION_RADIUS_METERS = 15
+const isGuidedTourActive = ref(false)
+const guidedTourSteps = ref<GuidedTourStep[]>([])
+const guidedTourNsteps = ref(0)
+const isGuidedTourLoading = ref(false)
+const guidedTourError = ref<string | null>(null)
+const activeGuidedTourStep = computed(() => guidedTourSteps.value[guidedTourNsteps.value] ?? null)
+const activeGuidedTourBuilding = computed(() => activeGuidedTourStep.value?.building ?? null)
+const isGuidedTourComplete = computed(
+  () => guidedTourSteps.value.length > 0 && guidedTourNsteps.value >= guidedTourSteps.value.length
+)
+const visibleArBuildings = computed(() => {
+  if (!isGuidedTourActive.value) {
+    return arBuildings.value
+  }
+
+  return activeGuidedTourBuilding.value ? [activeGuidedTourBuilding.value] : []
+})
 const {
+  buildingDistances: arBuildingDistances,
   markers: arMarkers,
   primaryMarker: primaryArMarker,
   status: arStatus,
   start: startCampusAr,
   stop: stopCampusAr
-} = useCampusAr(arBuildings)
+} = useCampusAr(visibleArBuildings)
+const activeGuidedTourDistanceMeters = computed(() => {
+  const activeBuilding = activeGuidedTourBuilding.value
+
+  if (!activeBuilding) {
+    return null
+  }
+
+  return arBuildingDistances.value.find((building) => building.id === activeBuilding.id)?.distanceMeters ?? null
+})
+const hasArOverlayBuildings = computed(() => (
+  isGuidedTourActive.value ? guidedTourSteps.value.length > 0 : arBuildings.value.length > 0
+))
+const isArOverlayLoading = computed(() => (
+  isArBuildingsLoading.value || (isGuidedTourActive.value && isGuidedTourLoading.value)
+))
 
 watch(() => primaryArMarker.value?.id, (newId, oldId) => {
   if (isSpeakEnabled.value && newId && newId !== oldId && primaryArMarker.value && import.meta.client) {
@@ -542,39 +598,132 @@ async function fetchCampusBuildings(tableName: string) {
     .sort((left, right) => left.name.localeCompare(right.name))
 }
 
+let campusBuildingsLoadPromise: Promise<void> | null = null
+
 async function loadCampusBuildings() {
-  if (isArBuildingsLoading.value) {
-    return
+  if (campusBuildingsLoadPromise) {
+    return campusBuildingsLoadPromise
   }
 
-  isArBuildingsLoading.value = true
+  campusBuildingsLoadPromise = (async () => {
+    isArBuildingsLoading.value = true
 
-  try {
-    for (const source of [
-      { tableName: 'building', label: 'Supabase building' },
-      { tableName: 'buildings', label: 'Supabase buildings' },
-      { tableName: 'campus_buildings', label: 'Supabase campus_buildings' }
-    ]) {
-      try {
-        const mappedBuildings = await fetchCampusBuildings(source.tableName)
+    try {
+      for (const source of [
+        { tableName: 'building', label: 'Supabase building' },
+        { tableName: 'buildings', label: 'Supabase buildings' },
+        { tableName: 'campus_buildings', label: 'Supabase campus_buildings' }
+      ]) {
+        try {
+          const mappedBuildings = await fetchCampusBuildings(source.tableName)
 
-        if (mappedBuildings.length > 0) {
-          arBuildings.value = mappedBuildings
-          arBuildingSource.value = source.label
-          arBuildingTableName.value = source.tableName
-          return
+          if (mappedBuildings.length > 0) {
+            arBuildings.value = mappedBuildings
+            arBuildingSource.value = source.label
+            arBuildingTableName.value = source.tableName
+            return
+          }
+        } catch (error) {
+          console.warn(`Unable to load ${source.tableName}.`, error)
         }
-      } catch (error) {
-        console.warn(`Unable to load ${source.tableName}.`, error)
       }
+
+      arBuildings.value = []
+      arBuildingSource.value = 'No Supabase building dataset available'
+      arBuildingTableName.value = null
+    } finally {
+      isArBuildingsLoading.value = false
+      campusBuildingsLoadPromise = null
     }
-  } finally {
-    isArBuildingsLoading.value = false
+  })()
+
+  return campusBuildingsLoadPromise
+}
+
+function parseGuidedTourOrder(value: number | string | null | undefined, fallback: number) {
+  const parsedValue = parseCoordinateValue(value, Number.NaN)
+
+  return Number.isFinite(parsedValue) ? parsedValue : fallback
+}
+
+function mapGuidedTourBuilding(row: GuidedTourRow) {
+  const linkedBuilding = row.building_id
+    ? arBuildings.value.find((building) => building.id === String(row.building_id))
+    : null
+
+  if (linkedBuilding) {
+    return linkedBuilding
   }
 
-  arBuildings.value = []
-  arBuildingSource.value = 'No Supabase building dataset available'
-  arBuildingTableName.value = null
+  const embeddedBuilding = row.building ?? row.buildings ?? row.campus_buildings ?? null
+
+  if (embeddedBuilding) {
+    return mapCampusBuildingRow(embeddedBuilding)
+  }
+
+  return mapCampusBuildingRow({
+    ...row,
+    id: row.building_id ?? row.id
+  })
+}
+
+function mapGuidedTourRows(rows: GuidedTourRow[]) {
+  return rows
+    .map((row, index) => {
+      const building = mapGuidedTourBuilding(row)
+
+      if (!building) {
+        console.warn(`Guided tour step ${row.id ?? index + 1} has no mapped building coordinates.`)
+        return null
+      }
+
+      return {
+        id: String(row.id ?? `${building.id}-${index}`),
+        order: parseGuidedTourOrder(row.step, index + 1),
+        storytelling: row.storytelling?.trim() || row.description?.trim() || null,
+        building
+      }
+    })
+    .filter((step): step is GuidedTourStep => step !== null)
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+}
+
+let guidedTourLoadPromise: Promise<void> | null = null
+
+async function loadGuidedTour() {
+  if (guidedTourLoadPromise) {
+    return guidedTourLoadPromise
+  }
+
+  guidedTourLoadPromise = (async () => {
+    isGuidedTourLoading.value = true
+    guidedTourError.value = null
+
+    try {
+      await loadCampusBuildings()
+
+      const response = await $fetch<GuidedTourStepsResponse>('/api/guided-tour-steps', {
+        timeout: 70000
+      })
+      const rows = Array.isArray(response.steps) ? response.steps : []
+      guidedTourSteps.value = mapGuidedTourRows(rows)
+      guidedTourNsteps.value = 0
+
+      if (guidedTourSteps.value.length === 0) {
+        guidedTourError.value = 'No guided tour steps are available.'
+      }
+    } catch (error) {
+      console.warn('Unable to load guided tour.', error)
+      guidedTourSteps.value = []
+      guidedTourNsteps.value = 0
+      guidedTourError.value = 'Unable to load guided tour.'
+    } finally {
+      isGuidedTourLoading.value = false
+      guidedTourLoadPromise = null
+    }
+  })()
+
+  return guidedTourLoadPromise
 }
 
 async function loadArBuildingHistoricalDetails(buildingId: string) {
@@ -683,6 +832,7 @@ async function startCamera() {
     console.error('Camera access error:', error)
     cameraPermissionState.value = 'denied'
     isArMode.value = false
+    isGuidedTourActive.value = false
     alert(
       error instanceof Error
         ? error.message
@@ -700,6 +850,12 @@ function stopCamera() {
   if (videoElement.value) {
     videoElement.value.srcObject = null
   }
+}
+
+function clearSelectedArBuildingDetails() {
+  selectedArBuildingId.value = null
+  selectedArBuildingHistoricalDetails.value = null
+  arBuildingDetailsError.value = null
 }
 
 async function requestArAccess() {
@@ -729,18 +885,38 @@ async function enableArMode() {
   }
 
   isArMode.value = true
+  isGuidedTourActive.value = false
+  guidedTourNsteps.value = 0
+  guidedTourError.value = null
   sheetDragY.value = 0
+  clearSelectedArBuildingDetails()
   const buildingLoadPromise = loadCampusBuildings()
   await requestArAccess()
   await buildingLoadPromise
 }
 
+async function enableGuidedTourMode() {
+  if (!import.meta.client) {
+    return
+  }
+
+  isArMode.value = true
+  isGuidedTourActive.value = true
+  guidedTourNsteps.value = 0
+  guidedTourError.value = null
+  sheetDragY.value = 0
+  clearSelectedArBuildingDetails()
+  const guidedTourLoadPromise = loadGuidedTour()
+  await requestArAccess()
+  await guidedTourLoadPromise
+}
+
 function disableArMode() {
   isArMode.value = false
+  isGuidedTourActive.value = false
   sheetDragY.value = 0
-  selectedArBuildingId.value = null
-  selectedArBuildingHistoricalDetails.value = null
-  arBuildingDetailsError.value = null
+  guidedTourNsteps.value = 0
+  clearSelectedArBuildingDetails()
   stopCampusAr()
   stopCamera()
 }
@@ -753,6 +929,39 @@ async function toggleArMode() {
 
   await enableArMode()
 }
+
+function completeGuidedTourStep() {
+  if (!isGuidedTourActive.value || isGuidedTourComplete.value) {
+    return
+  }
+
+  guidedTourNsteps.value = Math.min(guidedTourNsteps.value + 1, guidedTourSteps.value.length)
+  clearSelectedArBuildingDetails()
+}
+
+async function toggleGuidedTourMode() {
+  if (isGuidedTourActive.value) {
+    disableArMode()
+    return
+  }
+
+  await enableGuidedTourMode()
+}
+
+watch(activeGuidedTourDistanceMeters, (distanceMeters) => {
+  if (
+    !isGuidedTourActive.value ||
+    isGuidedTourLoading.value ||
+    !activeGuidedTourStep.value ||
+    distanceMeters === null
+  ) {
+    return
+  }
+
+  if (distanceMeters <= GUIDED_TOUR_COMPLETION_RADIUS_METERS) {
+    completeGuidedTourStep()
+  }
+})
 
 // Questa funzione gestisce l'invio del form della chat.
 async function submitChat() {
@@ -866,9 +1075,17 @@ onBeforeUnmount(() => {
       :building-source-label="arBuildingSource"
       :camera-permission-state="cameraPermissionState"
       :enabled="isArMode"
-      :has-buildings="arBuildings.length > 0"
+      :guided-tour-completion-radius-meters="GUIDED_TOUR_COMPLETION_RADIUS_METERS"
+      :guided-tour-current-distance-meters="activeGuidedTourDistanceMeters"
+      :guided-tour-current-name="activeGuidedTourStep?.building.name ?? null"
+      :guided-tour-current-storytelling="activeGuidedTourStep?.storytelling ?? null"
+      :guided-tour-error="guidedTourError"
+      :guided-tour-nsteps="guidedTourNsteps"
+      :guided-tour-total-steps="guidedTourSteps.length"
+      :has-buildings="hasArOverlayBuildings"
+      :is-guided-tour-active="isGuidedTourActive"
       :is-loading-building-details="isLoadingArBuildingDetails"
-      :is-loading-buildings="isArBuildingsLoading"
+      :is-loading-buildings="isArOverlayLoading"
       :is-requesting-access="isRequestingArAccess"
       :markers="arMarkers"
       :primary-marker="primaryArMarker"
@@ -936,15 +1153,22 @@ onBeforeUnmount(() => {
           :class="isArMode ? 'fixed top-6 left-6 z-50 flex-row items-center gap-4 pointer-events-auto' : 'relative flex-row justify-center gap-[14px]'"
           class="hero-actions transition-all duration-700 ease-[cubic-bezier(0.34,1.1,0.64,1)]"
         >
-          <button :class="{ 'ar-button-active': isArMode }" class="hero-button" type="button" @click="toggleArMode">
+          <button :class="{ 'ar-button-active': isArMode && !isGuidedTourActive }" class="hero-button" type="button" @click="toggleArMode">
             <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
               <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
               <line x1="12" x2="12" y1="22.08" y2="12" />
             </svg>
-            {{ isArMode ? 'Exit AR Mode' : 'AR Mode' }}
+            {{ isArMode ? (isGuidedTourActive ? 'Exit Tour' : 'Exit AR Mode') : 'AR Mode' }}
           </button>
-          <button :class="isArMode ? 'translate-x-0' : ''" class="hero-button transition-all duration-500 delay-100" type="button">Guided Tour</button>
+          <button
+            :class="[{ 'ar-button-active': isGuidedTourActive }, isArMode ? 'translate-x-0' : '']"
+            class="hero-button transition-all duration-500 delay-100"
+            type="button"
+            @click="toggleGuidedTourMode"
+          >
+            Guided Tour
+          </button>
         </div>
       </div>
 

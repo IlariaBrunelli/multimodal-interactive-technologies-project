@@ -12,6 +12,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     n8nCampusChatWebhook: process.env.N8N_CAMPUS_CHAT_WEBHOOK || '',
+    n8nGuidedTourStepsWebhook:
+      process.env.N8N_GUIDED_TOUR_STEPS_WEBHOOK ||
+      'http://localhost:5678/webhook/get-guided-tour-steps',
     public: {
       supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || '',
       supabaseAnonKey:

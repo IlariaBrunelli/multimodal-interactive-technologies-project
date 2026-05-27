@@ -15,6 +15,13 @@ export type CampusArMarker = {
   confidence: number
 }
 
+export type CampusArBuildingDistance = {
+  id: string
+  name: string
+  distanceMeters: number
+  bearing: number
+}
+
 export type CampusArStatus = {
   heading: number | null
   pitch: number | null
@@ -446,6 +453,19 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
     stopResizeWatch()
   }
 
+  const buildingDistances = computed<CampusArBuildingDistance[]>(() => {
+    if (!userFix.value) {
+      return []
+    }
+
+    return buildings.value.map((building) => ({
+      id: building.id,
+      name: building.name,
+      distanceMeters: computeDistanceMeters(userFix.value as GeoFix, building),
+      bearing: computeBearingDegrees(userFix.value as GeoFix, building)
+    }))
+  })
+
   const markers = computed<CampusArMarker[]>(() => {
     if (!userFix.value || pose.value.heading === null) {
       return []
@@ -517,6 +537,7 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
   onBeforeUnmount(stop)
 
   return {
+    buildingDistances,
     markers,
     primaryMarker,
     status,

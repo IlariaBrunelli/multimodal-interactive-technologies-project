@@ -15,12 +15,40 @@ const props = defineProps<{
   buildingHistoricalDetails?: string | null
   isLoadingBuildingDetails?: boolean
   buildingDetailsError?: string | null
+  isGuidedTourActive?: boolean
+  guidedTourNsteps?: number
+  guidedTourTotalSteps?: number
+  guidedTourCurrentName?: string | null
+  guidedTourCurrentStorytelling?: string | null
+  guidedTourCurrentDistanceMeters?: number | null
+  guidedTourCompletionRadiusMeters?: number
+  guidedTourError?: string | null
 }>()
 
 const emit = defineEmits<{
   requestAccess: []
   requestBuildingDetails: [buildingId: string]
 }>()
+
+const guidedTourNsteps = computed(() => props.guidedTourNsteps ?? 0)
+const guidedTourTotalSteps = computed(() => props.guidedTourTotalSteps ?? 0)
+const guidedTourCompletionRadius = computed(() => props.guidedTourCompletionRadiusMeters ?? 15)
+const isGuidedTourComplete = computed(() => (
+  Boolean(props.isGuidedTourActive) &&
+  guidedTourTotalSteps.value > 0 &&
+  guidedTourNsteps.value >= guidedTourTotalSteps.value
+))
+const guidedTourStepNumber = computed(() => Math.min(guidedTourNsteps.value + 1, guidedTourTotalSteps.value))
+const guidedTourDistanceLabel = computed(() => {
+  if (
+    props.guidedTourCurrentDistanceMeters === null ||
+    typeof props.guidedTourCurrentDistanceMeters === 'undefined'
+  ) {
+    return null
+  }
+
+  return `${Math.round(props.guidedTourCurrentDistanceMeters)} m away`
+})
 
 const emptyState = computed(() => {
   if (props.cameraPermissionState === 'denied') {
@@ -73,15 +101,38 @@ const emptyState = computed(() => {
 
   if (props.isLoadingBuildings) {
     return {
-      title: 'Loading building anchors',
-      detail: 'Reading mapped buildings...'
+      title: props.isGuidedTourActive ? 'Loading guided tour' : 'Loading building anchors',
+      detail: props.isGuidedTourActive ? 'Reading ordered tour stops...' : 'Reading mapped buildings...'
+    }
+  }
+
+  if (props.isGuidedTourActive && props.guidedTourError) {
+    return {
+      title: 'Guided tour unavailable',
+      detail: props.guidedTourError
+    }
+  }
+
+  if (isGuidedTourComplete.value) {
+    return {
+      title: 'Guided tour complete',
+      detail: 'All guided tour stops have been reached.'
     }
   }
 
   if (!props.hasBuildings) {
     return {
-      title: 'No building dataset available',
-      detail: 'Load building rows from Supabase before using the outdoor AR overlay.'
+      title: props.isGuidedTourActive ? 'No guided tour stops' : 'No building dataset available',
+      detail: props.isGuidedTourActive
+        ? 'Add rows to guided_tour and connect each step to a mapped building.'
+        : 'Load building rows from Supabase before using the outdoor AR overlay.'
+    }
+  }
+
+  if (props.isGuidedTourActive && props.guidedTourCurrentName && props.markers.length === 0) {
+    return {
+      title: 'Find the next stop',
+      detail: `Move toward ${props.guidedTourCurrentName}. This step completes within ${guidedTourCompletionRadius.value} meters.`
     }
   }
 
@@ -147,6 +198,25 @@ function shouldShowPrimaryDetails() {
       </div>
     </div>
 
+    <div v-if="isGuidedTourActive" class="guided-tour-status">
+      <div class="guided-tour-status-header">
+        <span>Guided Tour</span>
+        <strong>{{ guidedTourNsteps }} / {{ guidedTourTotalSteps }}</strong>
+      </div>
+      <div v-if="isGuidedTourComplete" class="guided-tour-status-body">
+        <strong>Tour complete</strong>
+        <span>All stops reached.</span>
+      </div>
+      <div v-else class="guided-tour-status-body">
+        <span v-if="guidedTourTotalSteps > 0">Step {{ guidedTourStepNumber }} of {{ guidedTourTotalSteps }}</span>
+        <strong>{{ guidedTourCurrentName ?? 'Loading next stop' }}</strong>
+        <span v-if="guidedTourCurrentStorytelling">{{ guidedTourCurrentStorytelling }}</span>
+        <span v-if="guidedTourDistanceLabel">
+          {{ guidedTourDistanceLabel }} - complete within {{ guidedTourCompletionRadius }} m
+        </span>
+      </div>
+    </div>
+
     <div v-if="emptyState" class="ar-empty-state">
       <strong>{{ emptyState.title }}</strong>
       <span>{{ emptyState.detail }}</span>
@@ -200,6 +270,7 @@ function shouldShowPrimaryDetails() {
 .ar-marker-label,
 .ar-primary-card,
 .ar-empty-state,
+.guided-tour-status,
 .ar-error-banner {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(15, 23, 42, 0.74);
@@ -248,6 +319,52 @@ function shouldShowPrimaryDetails() {
   width: 18px;
   height: 18px;
   box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.14);
+}
+
+.guided-tour-status {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: min(330px, calc(100vw - 48px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.guided-tour-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(226, 232, 240, 0.92);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.guided-tour-status-header strong {
+  color: #f8fafc;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.guided-tour-status-body {
+  display: grid;
+  gap: 4px;
+}
+
+.guided-tour-status-body strong {
+  color: #f8fafc;
+  font-size: 0.96rem;
+  line-height: 1.2;
+}
+
+.guided-tour-status-body span {
+  color: rgba(226, 232, 240, 0.92);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .ar-empty-state {
@@ -342,6 +459,13 @@ function shouldShowPrimaryDetails() {
 }
 
 @media (max-width: 640px) {
+  .guided-tour-status {
+    top: 92px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+
   .ar-primary-card {
     left: 12px;
     right: 12px;
