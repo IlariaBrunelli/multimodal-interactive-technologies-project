@@ -165,6 +165,14 @@ const showClassroomNavigation = ref(false)
 const isListening = ref(false)
 let speechRecognition: BrowserSpeechRecognition | null = null
 
+const isSpeakEnabled = ref(false)
+function toggleSpeak() {
+  isSpeakEnabled.value = !isSpeakEnabled.value
+  if (import.meta.client) {
+    window.speechSynthesis.cancel()
+  }
+}
+
 // AR Mode states per invocare la videocamera e collassare l'UI
 const isArMode = ref(false)
 const videoElement = ref<HTMLVideoElement | null>(null)
@@ -187,6 +195,16 @@ const {
   start: startCampusAr,
   stop: stopCampusAr
 } = useCampusAr(arBuildings)
+
+watch(() => primaryArMarker.value?.id, (newId, oldId) => {
+  if (isSpeakEnabled.value && newId && newId !== oldId && primaryArMarker.value && import.meta.client) {
+    window.speechSynthesis.cancel()
+    const text = `${primaryArMarker.value.name}, ${Math.round(primaryArMarker.value.distanceMeters)} meters away.`
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = navigator.language || 'en-US'
+    window.speechSynthesis.speak(utterance)
+  }
+})
 
 // Modal Bottom Sheet State per la Chat
 const isSheetDragging = ref(false)
@@ -364,17 +382,29 @@ function startMicrophone() {
   speechRecognition = new SpeechConstructor()
   speechRecognition.lang = import.meta.client ? navigator.language : 'en-US'
   speechRecognition.continuous = false
-  speechRecognition.interimResults = false
+  speechRecognition.interimResults = true
+
+  let basePromptForMic = userPrompt.value
 
   speechRecognition.onresult = (event) => {
-    const transcript = Array.from(event.results)
-      .map(result => result[0]?.transcript || '')
-      .join(' ')
-      .trim()
-    
-    if (transcript) {
-      userPrompt.value = userPrompt.value ? `${userPrompt.value} ${transcript}` : transcript
+    let interimTranscript = ''
+    let finalTranscript = ''
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript
+      } else {
+        interimTranscript += event.results[i][0].transcript
+      }
     }
+
+    if (finalTranscript) {
+      basePromptForMic = basePromptForMic ? `${basePromptForMic} ${finalTranscript}`.trim() : finalTranscript
+    }
+
+    userPrompt.value = [basePromptForMic, interimTranscript]
+      .filter(t => t.trim().length > 0)
+      .join(' ')
   }
 
   speechRecognition.onerror = (event) => {
@@ -573,9 +603,22 @@ async function loadArBuildingHistoricalDetails(buildingId: string) {
 
     const details = (data as BuildingHistoricalDetailsRow | null)?.historical_details?.trim()
     selectedArBuildingHistoricalDetails.value = details || null
+    if (isSpeakEnabled.value && import.meta.client) {
+      window.speechSynthesis.cancel()
+      const textToSpeak = details || 'No historical details available for this building.'
+      const utterance = new SpeechSynthesisUtterance(textToSpeak)
+      utterance.lang = navigator.language || 'en-US'
+      window.speechSynthesis.speak(utterance)
+    }
   } catch (error) {
     console.warn('Unable to load building historical details.', error)
     arBuildingDetailsError.value = 'Unable to load building details.'
+    if (isSpeakEnabled.value && import.meta.client) {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance('Unable to load building details.')
+      utterance.lang = navigator.language || 'en-US'
+      window.speechSynthesis.speak(utterance)
+    }
   } finally {
     isLoadingArBuildingDetails.value = false
   }
@@ -761,11 +804,26 @@ async function submitChat() {
       role: 'assistant',
       text: response.reply
     }
+
+    if (isSpeakEnabled.value && import.meta.client) {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(response.reply)
+      utterance.lang = navigator.language || 'en-US'
+      window.speechSynthesis.speak(utterance)
+    }
   } catch (error: any) {
     const errorMsg = error.data?.statusMessage || error.message || 'Errore sconosciuto'
+    const fallbackText = `Non riesco a contattare l'agente in questo momento. (${errorMsg})`
     chatMessages.value[assistantMessageIndex] = {
       role: 'assistant',
-      text: `Non riesco a contattare l'agente in questo momento. (${errorMsg})`
+      text: fallbackText
+    }
+
+    if (isSpeakEnabled.value && import.meta.client) {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(fallbackText)
+      utterance.lang = navigator.language || 'en-US'
+      window.speechSynthesis.speak(utterance)
     }
   } finally {
     isChatLoading.value = false
@@ -823,6 +881,22 @@ onBeforeUnmount(() => {
     <!-- Gradienti atmosferici originali -->
     <div :class="isArMode ? 'opacity-0' : 'opacity-80'" class="background-orb orb-left transition-opacity duration-500" />
     <div :class="isArMode ? 'opacity-0' : 'opacity-80'" class="background-orb orb-right transition-opacity duration-500" />
+
+    <!-- Pulsante Speak -->
+    <button
+      type="button"
+      :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'"
+      class="speak-btn transition-opacity duration-500"
+      @click="toggleSpeak"
+      :aria-label="isSpeakEnabled ? 'Disable voice' : 'Enable voice'"
+    >
+      <svg v-if="isSpeakEnabled" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+      </svg>
+      <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+      </svg>
+    </button>
 
     <!-- Pulsante Login -->
     <NuxtLink :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'" aria-label="Open login page" class="login-link transition-opacity duration-500" to="/login">
@@ -1199,6 +1273,35 @@ onBeforeUnmount(() => {
   width: 24px;
   height: 24px;
   fill: var(--primary-dark);
+}
+
+.speak-btn {
+  position: absolute;
+  top: 20px;
+  right: 80px;
+  z-index: 2;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  color: var(--primary-dark);
+}
+
+.speak-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+}
+
+.speak-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 
 .hero-card,
