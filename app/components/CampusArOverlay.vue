@@ -31,6 +31,10 @@ const emit = defineEmits<{
   requestBuildingDetails: [buildingId: string]
 }>()
 
+type RenderedCampusArMarker = CampusArMarker & {
+  isGuidedTourFallback?: boolean
+}
+
 const guidedTourNsteps = computed(() => props.guidedTourNsteps ?? 0)
 const guidedTourTotalSteps = computed(() => props.guidedTourTotalSteps ?? 0)
 const guidedTourCompletionRadius = computed(() => props.guidedTourCompletionRadiusMeters ?? 15)
@@ -59,6 +63,75 @@ const guidedTourDistanceLabel = computed(() => {
   }
 
   return `${Math.round(props.guidedTourCurrentDistanceMeters)} m away`
+})
+const overlayViewport = ref({
+  width: 1,
+  height: 1
+})
+const renderedMarkers = computed<RenderedCampusArMarker[]>(() => {
+  if (props.markers.length > 0) {
+    return props.markers
+  }
+
+  if (!props.isGuidedTourActive || isGuidedTourComplete.value || !guidedTourBuildingLabel.value) {
+    return []
+  }
+
+  const width = overlayViewport.value.width
+  const height = overlayViewport.value.height
+
+  return [
+    {
+      id: 'guided-tour-fallback-target',
+      name: guidedTourBuildingLabel.value,
+      color: '#ef4444',
+      distanceMeters: props.guidedTourCurrentDistanceMeters ?? 0,
+      bearing: props.sensorStatus.heading ?? 0,
+      relativeBearing: 0,
+      x: Math.min(Math.max(width / 2, 44), width - 44),
+      y: Math.min(Math.max(height * 0.52, 220), Math.max(220, height - 190)),
+      confidence: 0.92,
+      isPinnedTarget: true,
+      isGuidedTourFallback: true
+    }
+  ]
+})
+
+function updateOverlayViewport() {
+  if (!import.meta.client) {
+    return
+  }
+
+  overlayViewport.value = {
+    width: Math.max(window.innerWidth, 1),
+    height: Math.max(window.innerHeight, 1)
+  }
+}
+
+function getMarkerDetailLabel(marker: RenderedCampusArMarker) {
+  if (marker.isGuidedTourFallback) {
+    return guidedTourDistanceLabel.value ?? 'Target position'
+  }
+
+  if (marker.isPinnedTarget) {
+    return 'Target direction'
+  }
+
+  return `${Math.round(marker.distanceMeters)} m`
+}
+
+onMounted(() => {
+  updateOverlayViewport()
+
+  if (import.meta.client) {
+    window.addEventListener('resize', updateOverlayViewport)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (import.meta.client) {
+    window.removeEventListener('resize', updateOverlayViewport)
+  }
 })
 
 const emptyState = computed(() => {
@@ -189,12 +262,13 @@ function shouldShowPrimaryDetails() {
 <template>
   <div v-if="enabled" class="campus-ar-overlay">
     <div
-      v-for="marker in markers"
+      v-for="marker in renderedMarkers"
       :key="marker.id"
       class="ar-marker"
       :class="{
         'ar-marker--primary': primaryMarker?.id === marker.id,
-        'ar-marker--pinned-target': marker.isPinnedTarget
+        'ar-marker--pinned-target': marker.isPinnedTarget,
+        'ar-marker--guided-target': isGuidedTourActive
       }"
       :style="{
         left: `${marker.x}px`,
@@ -209,7 +283,7 @@ function shouldShowPrimaryDetails() {
       ></div>
       <div class="ar-marker-label">
         <strong>{{ marker.name }}</strong>
-        <span>{{ marker.isPinnedTarget ? 'Target direction' : `${Math.round(marker.distanceMeters)} m` }}</span>
+        <span>{{ getMarkerDetailLabel(marker) }}</span>
       </div>
     </div>
 
@@ -367,6 +441,10 @@ function shouldShowPrimaryDetails() {
 
 .ar-marker--pinned-target {
   opacity: 0.94 !important;
+}
+
+.ar-marker--guided-target {
+  z-index: 4;
 }
 
 .ar-marker--pinned-target .ar-marker-label {

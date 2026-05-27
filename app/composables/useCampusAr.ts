@@ -473,12 +473,37 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
   })
 
   const markers = computed<CampusArMarker[]>(() => {
-    if (!userFix.value || pose.value.heading === null) {
+    if (!userFix.value) {
       return []
     }
 
     const verticalFov = computeVerticalFovDegrees(viewport.width, viewport.height)
     const shouldPinSingleTarget = buildings.value.length === 1
+
+    if (pose.value.heading === null) {
+      if (!shouldPinSingleTarget) {
+        return []
+      }
+
+      return buildings.value.map((building) => {
+        const distanceMeters = computeDistanceMeters(userFix.value as GeoFix, building)
+        const bearing = computeBearingDegrees(userFix.value as GeoFix, building)
+
+        return {
+          id: building.id,
+          name: building.name,
+          color: building.color ?? '#2563eb',
+          distanceMeters,
+          bearing,
+          relativeBearing: 0,
+          x: clamp(viewport.width / 2, 36, viewport.width - 36),
+          y: clamp(viewport.height * 0.52, 120, viewport.height - 190),
+          confidence: 0.88,
+          isPinnedTarget: true
+        }
+      })
+    }
+
     const visibleMarkers = buildings.value
       .map((building) => {
         const distanceMeters = computeDistanceMeters(userFix.value as GeoFix, building)
