@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import type { ArPermissionState } from '~/composables/useCampusAr'
 import type { CampusBuilding } from '~/data/campusBuildings'
 import { getChatLocationCoordinates } from '~/composables/useChatLocation'
@@ -109,14 +109,6 @@ const buttons = ref<MenuButton[]>([
     colorCollapsed: 'bg-white text-orange-500 border-orange-400 hover:bg-orange-50'
   },
   {
-    id: 5,
-    text: 'Water Fountains',
-    link: '/fountains',
-    iconPath: 'M7 4h10v3a5 5 0 0 1-10 0V4z M12 12v8 M9 20h6 M5 16h14 M8 9c.75 1.85 2.1 3 4 3s3.25-1.15 4-3',
-    colorExpanded: 'bg-sky-50 text-sky-600 border-sky-500 hover:bg-sky-100',
-    colorCollapsed: 'bg-white text-sky-500 border-sky-400 hover:bg-sky-50'
-  },
-  {
     id: 2,
     text: 'Plugs',
     link: '/plugs',
@@ -126,16 +118,16 @@ const buttons = ref<MenuButton[]>([
   },
   {
     id: 3,
-    text: 'Bathrooms',
-    link: '/bathrooms',
+    text: 'Water Fountains',
+    link: '/fountains',
     iconPath: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z',
     colorExpanded: 'bg-cyan-50 text-cyan-600 border-cyan-500 hover:bg-cyan-100',
     colorCollapsed: 'bg-white text-cyan-500 border-cyan-400 hover:bg-cyan-50'
   },
   {
     id: 4,
-    text: 'Lunch Places',
-    link: '/lunch',
+    text: 'Food Places',
+    link: '/food',
     iconPath: 'M9 3v6c0 1.66-1.34 3-3 3s-3-1.34-3-3V3m3 3v15 M15 3v18 M15 3c2.5 0 6 1.5 6 4s-3.5 4-6 4',
     colorExpanded: 'bg-rose-50 text-rose-600 border-rose-500 hover:bg-rose-100',
     colorCollapsed: 'bg-white text-rose-500 border-rose-400 hover:bg-rose-50'
@@ -284,16 +276,9 @@ async function goToPage(button: MenuButton) {
     return
   }
 
-  if (button.link === '/microwaves' || button.link === '/fountains') {
-    isExpanded.value = false
-    document.body.style.overflow = 'auto'
-    await navigateTo(button.link)
-    return
-  }
-
-  if (import.meta.client) {
-    window.alert(`Navigo a: ${button.link}`)
-  }
+  isExpanded.value = false
+  document.body.style.overflow = 'auto'
+  await navigateTo(button.link)
 }
 
 const chatbotWindow = ref<HTMLElement | null>(null)
@@ -807,61 +792,61 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="home-shell" :class="{ 'bg-black': isArMode }">
+  <main :class="{ 'bg-black': isArMode }" class="home-shell">
     <!-- Camera background -->
     <video 
       ref="videoElement" 
-      autoplay 
-      playsinline 
-      muted 
+      :class="isArMode ? 'opacity-100' : 'opacity-0'"
+      autoplay
       class="ar-camera-view transition-opacity duration-[800ms] pointer-events-none"
-      :class="isArMode ? 'opacity-100' : 'opacity-0'" 
+      muted
+      playsinline
     />
     <CampusArOverlay
-      :enabled="isArMode"
-      :markers="arMarkers"
-      :primary-marker="primaryArMarker"
-      :sensor-status="arStatus"
-      :camera-permission-state="cameraPermissionState"
+      :building-details-error="arBuildingDetailsError"
+      :building-historical-details="selectedArBuildingHistoricalDetails"
       :building-source-label="arBuildingSource"
+      :camera-permission-state="cameraPermissionState"
+      :enabled="isArMode"
       :has-buildings="arBuildings.length > 0"
+      :is-loading-building-details="isLoadingArBuildingDetails"
       :is-loading-buildings="isArBuildingsLoading"
       :is-requesting-access="isRequestingArAccess"
+      :markers="arMarkers"
+      :primary-marker="primaryArMarker"
       :selected-building-id="selectedArBuildingId"
-      :building-historical-details="selectedArBuildingHistoricalDetails"
-      :is-loading-building-details="isLoadingArBuildingDetails"
-      :building-details-error="arBuildingDetailsError"
+      :sensor-status="arStatus"
       @request-access="requestArAccess"
       @request-building-details="loadArBuildingHistoricalDetails"
     />
 
     <!-- Gradienti atmosferici originali -->
-    <div class="background-orb orb-left transition-opacity duration-500" :class="isArMode ? 'opacity-0' : 'opacity-80'" />
-    <div class="background-orb orb-right transition-opacity duration-500" :class="isArMode ? 'opacity-0' : 'opacity-80'" />
+    <div :class="isArMode ? 'opacity-0' : 'opacity-80'" class="background-orb orb-left transition-opacity duration-500" />
+    <div :class="isArMode ? 'opacity-0' : 'opacity-80'" class="background-orb orb-right transition-opacity duration-500" />
 
     <!-- Pulsante Login -->
-    <NuxtLink class="login-link transition-opacity duration-500" :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'" to="/login" aria-label="Open login page">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
+    <NuxtLink :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'" aria-label="Open login page" class="login-link transition-opacity duration-500" to="/login">
+      <svg aria-hidden="true" viewBox="0 0 24 24">
         <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
       </svg>
     </NuxtLink>
 
     <section class="home-panel">
       <!-- Card principale della pagina. -->
-      <div class="hero-card transition-all duration-500" :class="isArMode ? '!bg-transparent !border-transparent !shadow-none !backdrop-blur-none !p-0 !m-0 pointer-events-none' : ''">
+      <div :class="isArMode ? '!bg-transparent !border-transparent !shadow-none !backdrop-blur-none !p-0 !m-0 pointer-events-none' : ''" class="hero-card transition-all duration-500">
         <div 
-          class="transition-all duration-300"
           :class="[
             !isSheetDragging ? 'transition-all duration-300' : '',
             isArMode ? 'opacity-0 pointer-events-none translate-y-[-20px]' : ''
           ]"
-          :style="{ 
-            opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 2), 
+          :style="{
+            opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 2),
             height: isArMode ? '0px' : `${(1 - sheetProgress) * 132}px`,
             transform: isArMode ? 'translateY(-20px)' : `scale(${1 - sheetProgress * 0.1})`,
             overflow: 'hidden',
             transformOrigin: 'top center'
           }"
+          class="transition-all duration-300"
         >
           <h1>PolinSight</h1>
           <p class="hero-copy">
@@ -874,62 +859,62 @@ onBeforeUnmount(() => {
         </div>
         
         <div 
-          class="hero-actions transition-all duration-700 ease-[cubic-bezier(0.34,1.1,0.64,1)]"
           :class="isArMode ? 'fixed top-6 left-6 z-50 flex-row items-center gap-4 pointer-events-auto' : 'relative flex-row justify-center gap-[14px]'"
+          class="hero-actions transition-all duration-700 ease-[cubic-bezier(0.34,1.1,0.64,1)]"
         >
-          <button type="button" class="hero-button" @click="toggleArMode" :class="{ 'ar-button-active': isArMode }">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button :class="{ 'ar-button-active': isArMode }" class="hero-button" type="button" @click="toggleArMode">
+            <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
               <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-              <line x1="12" y1="22.08" x2="12" y2="12" />
+              <line x1="12" x2="12" y1="22.08" y2="12" />
             </svg>
             {{ isArMode ? 'Exit AR Mode' : 'AR Mode' }}
           </button>
-          <button type="button" class="hero-button transition-all duration-500 delay-100" :class="isArMode ? 'translate-x-0' : ''">Guided Tour</button>
+          <button :class="isArMode ? 'translate-x-0' : ''" class="hero-button transition-all duration-500 delay-100" type="button">Guided Tour</button>
         </div>
       </div>
 
       <!-- Sezione del menu animato dei servizi. -->
       <section 
-        class="services-menu-section"
         :class="[
           !isSheetDragging ? 'transition-all duration-300' : '',
           isArMode ? 'opacity-0 pointer-events-none translate-y-10' : ''
         ]"
-        :style="{ 
-          opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 1.5), 
+        :style="{
+          opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 1.5),
           height: isArMode ? '0px' : `${(1 - sheetProgress) * 176}px`,
           overflow: sheetProgress > 0 || isArMode ? 'hidden' : 'visible'
         }"
+        class="services-menu-section"
       >
           <div
-            class="w-full flex items-center justify-center transition-colors duration-500"
             :class="isExpanded ? 'fixed inset-0 z-40 bg-white' : ''"
+            class="w-full flex items-center justify-center transition-colors duration-500"
           >
             <div
-              class="transition-all duration-500 ease-[cubic-bezier(0.34,1.1,0.64,1)] flex flex-col overflow-hidden"
               :class="isExpanded
                 ? 'bg-white w-[100vw] h-[100vh] pt-28 px-8 pb-8 sm:px-12 rounded-none z-50'
                 : 'services-card-collapsed w-full h-44 p-6 cursor-pointer relative'"
+              class="transition-all duration-500 ease-[cubic-bezier(0.34,1.1,0.64,1)] flex flex-col overflow-hidden"
               @click="!isExpanded && toggleExpand()"
             >
               <div
-                class="flex items-center justify-between transition-all duration-500"
                 :class="isExpanded ? 'mb-16 sm:mb-20' : 'mb-6'"
+                class="flex items-center justify-between transition-all duration-500"
               >
                 <span
-                  class="transition-all duration-500"
                   :class="isExpanded ? 'text-3xl sm:text-4xl' : 'text-[clamp(1.4rem,2.5vw,2.2rem)]'"
+                  class="transition-all duration-500"
                 >
                   Main Services
                 </span>
 
                 <button
-                  type="button"
                   :aria-expanded="isExpanded"
                   :aria-label="isExpanded ? 'Close services menu' : 'Open services menu'"
-                  class="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-all duration-500 focus:outline-none z-20 relative"
                   :class="isExpanded ? 'text-gray-400' : 'text-[#102C53]'"
+                  class="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-all duration-500 focus:outline-none z-20 relative"
+                  type="button"
                   @click.stop="toggleExpand"
                 >
                   <div class="relative w-7 h-7">
@@ -937,34 +922,35 @@ onBeforeUnmount(() => {
                       :class="isExpanded ? 'opacity-0 scale-50 rotate-90' : 'opacity-100 scale-100 rotate-0'"
                       class="absolute inset-0 w-7 h-7 transition-all duration-300"
                       fill="none"
-                      viewBox="0 0 24 24"
                       stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+                      <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" />
                     </svg>
                     <svg
                       :class="isExpanded ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-50 -rotate-90'"
                       class="absolute inset-0 w-7 h-7 transition-all duration-300"
                       fill="none"
-                      viewBox="0 0 24 24"
                       stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                      <path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" />
                     </svg>
                   </div>
                 </button>
               </div>
 
               <div
-                class="transition-all duration-500 flex flex-col w-full"
                 :class="isExpanded ? 'flex-1 justify-start max-w-3xl mx-auto' : 'justify-start'"
+                class="transition-all duration-500 flex flex-col w-full"
               >
-                <div class="relative w-full" :style="{ height: isExpanded ? `${Math.ceil(buttons.length / 2) * 104 - 18}px` : '56px' }">
+                <div :style="{ height: isExpanded ? `${Math.ceil(buttons.length / 2) * 104 - 18}px` : '56px' }" class="relative w-full">
                   <button
                     v-for="(button, index) in buttons"
                     :key="button.id"
-                    type="button"
-                    class="absolute transition-all duration-500 flex items-center justify-center overflow-hidden group focus:outline-none border-2"
+                    :class="isExpanded
+                      ? `shadow-lg ${button.colorExpanded}`
+                      : `${button.colorCollapsed} shadow-sm`"
                     :style="{
                       transitionDelay: isExpanded ? `${index * 60}ms` : `${(buttons.length - 1 - index) * 30}ms`,
                       transitionTimingFunction: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
@@ -974,38 +960,37 @@ onBeforeUnmount(() => {
                       height: isExpanded ? '80px' : '56px',
                       borderRadius: isExpanded ? '1.5rem' : '50%'
                     }"
-                    :class="isExpanded
-                      ? `shadow-lg ${button.colorExpanded}`
-                      : `${button.colorCollapsed} shadow-sm`"
+                    class="absolute transition-all duration-500 flex items-center justify-center overflow-hidden group focus:outline-none border-2"
+                    type="button"
                     @click.stop="goToPage(button)"
                   >
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
+                      :class="isExpanded ? 'opacity-0 scale-50' : 'opacity-100 scale-100'"
+                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(buttons.length - 1 - index) * 40 + 200}ms` }"
                       class="absolute transition-all duration-[400ms] w-7 h-7"
                       fill="none"
-                      viewBox="0 0 24 24"
                       stroke="currentColor"
                       stroke-width="2.5"
-                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(buttons.length - 1 - index) * 40 + 200}ms` }"
-                      :class="isExpanded ? 'opacity-0 scale-50' : 'opacity-100 scale-100'"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
+                      <path :d="button.iconPath" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
 
                     <div
-                      class="flex items-center justify-center gap-2 sm:gap-3 transition-all duration-300 w-full px-2"
-                      :style="{ transitionDelay: isExpanded ? `${index * 80 + 200}ms` : '0ms' }"
                       :class="isExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-75'"
+                      :style="{ transitionDelay: isExpanded ? `${index * 80 + 200}ms` : '0ms' }"
+                      class="flex items-center justify-center gap-2 sm:gap-3 transition-all duration-300 w-full px-2"
                     >
                       <svg
-                        xmlns="http://www.w3.org/2000/svg"
                         class="w-6 h-6 sm:w-7 sm:h-7 shrink-0"
                         fill="none"
-                        viewBox="0 0 24 24"
                         stroke="currentColor"
                         stroke-width="2.5"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
                       >
-                        <path stroke-linecap="round" stroke-linejoin="round" :d="button.iconPath" />
+                        <path :d="button.iconPath" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                       <span class="font-bold text-[1.05rem] sm:text-xl tracking-tight leading-tight text-left">{{ button.text }}</span>
                     </div>
@@ -1014,8 +999,8 @@ onBeforeUnmount(() => {
               </div>
 
               <div
-                class="transition-all duration-500 text-center text-gray-300 pb-8"
                 :class="isExpanded ? 'opacity-100 delay-500' : 'opacity-0 absolute bottom-0 pointer-events-none w-full left-0'"
+                class="transition-all duration-500 text-center text-gray-300 pb-8"
               >
                 <p class="uppercase tracking-widest text-xs font-bold">Menu Navigazione</p>
               </div>
@@ -1024,11 +1009,11 @@ onBeforeUnmount(() => {
       </section>
 
       <!-- Sezione chatbot. -->
-      <section class="chatbot-section" aria-label="Campus AI Assistant">
+      <section aria-label="Campus AI Assistant" class="chatbot-section">
         <div 
-          class="chatbot-card"
           :class="{ 'chatbot-card--dragging': isSheetDragging, 'transition-all duration-300': !isSheetDragging }"
           :style="{ transform: (isArMode && sheetDragY > 0) ? `translateY(${sheetDragY}px)` : 'translateY(0px)' }"
+          class="chatbot-card"
         >
           <div class="drag-handle" @pointerdown="onSheetPointerDown">
             <div class="drag-bar"></div>
@@ -1039,12 +1024,12 @@ onBeforeUnmount(() => {
               <h2 id="campus-ai-title">Campus AI Assistant</h2>
             </div>
             
-            <div class="prompt-list" aria-label="Suggested prompts">
+            <div aria-label="Suggested prompts" class="prompt-list">
               <button
                 v-for="prompt in starterPrompts"
                 :key="prompt"
-                type="button"
                 class="prompt-chip"
+                type="button"
                 @click="useStarterPrompt(prompt)"
               >
                 {{ prompt }}
@@ -1053,23 +1038,23 @@ onBeforeUnmount(() => {
           </div>
 
           <div
-            class="chatbot-window"
-            aria-live="polite"
             ref="chatbotWindow"
-            @scroll="handleChatScroll"
             :class="{
               'mask-both': chatScrollState.top && chatScrollState.bottom,
               'mask-top': chatScrollState.top && !chatScrollState.bottom,
               'mask-bottom': chatScrollState.bottom && !chatScrollState.top
             }"
+            aria-live="polite"
+            class="chatbot-window"
+            @scroll="handleChatScroll"
           >
             <div
               v-for="(message, index) in chatMessages"
               :key="`${message.role}-${index}`"
-              class="message-row"
               :class="`message-row--${message.role}`"
+              class="message-row"
             >
-              <div class="message-bubble" :class="`message-bubble--${message.role}`">
+              <div :class="`message-bubble--${message.role}`" class="message-bubble">
                 {{ message.text }}
               </div>
             </div>
@@ -1078,14 +1063,14 @@ onBeforeUnmount(() => {
           <form class="chatbot-form" @submit.prevent="submitChat">
             <label class="sr-only" for="campus-ai-input">Ask the campus assistant</label>
             <button
-              type="button"
-              class="chatbot-mic-button"
-              :class="{ 'chatbot-mic-button--listening': isListening }"
-              :aria-pressed="isListening"
               :aria-label="isListening ? 'Stop recording' : 'Enable microphone'"
+              :aria-pressed="isListening"
+              :class="{ 'chatbot-mic-button--listening': isListening }"
+              class="chatbot-mic-button"
+              type="button"
               @click="toggleMicrophone"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true" class="transition-transform duration-300" :class="{ 'scale-110': isListening }">
+              <svg :class="{ 'scale-110': isListening }" aria-hidden="true" class="transition-transform duration-300" viewBox="0 0 24 24">
                 <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
               </svg>
               
@@ -1095,14 +1080,14 @@ onBeforeUnmount(() => {
             <input
               id="campus-ai-input"
               v-model="userPrompt"
-              type="text"
-              class="chatbot-input"
-              :placeholder="isChatLoading ? 'Attendo la risposta...' : 'Chiedi qualcosa sulle lezioni...'"
               :disabled="isChatLoading"
+              :placeholder="isChatLoading ? 'Attendo la risposta...' : 'Chiedi qualcosa sulle lezioni...'"
+              class="chatbot-input"
+              type="text"
             >
-            <button type="submit" class="chatbot-send" :disabled="isChatLoading">
-              <svg v-if="!isChatLoading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
+            <button :disabled="isChatLoading" class="chatbot-send" type="submit">
+              <svg v-if="!isChatLoading" class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                <line x1="22" x2="11" y1="2" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
               </svg>
               <span v-else class="text-xs">...</span>
