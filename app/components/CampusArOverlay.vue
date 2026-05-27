@@ -192,7 +192,10 @@ function shouldShowPrimaryDetails() {
       v-for="marker in markers"
       :key="marker.id"
       class="ar-marker"
-      :class="{ 'ar-marker--primary': primaryMarker?.id === marker.id }"
+      :class="{
+        'ar-marker--primary': primaryMarker?.id === marker.id,
+        'ar-marker--pinned-target': marker.isPinnedTarget
+      }"
       :style="{
         left: `${marker.x}px`,
         top: `${marker.y}px`,
@@ -206,7 +209,7 @@ function shouldShowPrimaryDetails() {
       ></div>
       <div class="ar-marker-label">
         <strong>{{ marker.name }}</strong>
-        <span>{{ Math.round(marker.distanceMeters) }} m</span>
+        <span>{{ marker.isPinnedTarget ? 'Target direction' : `${Math.round(marker.distanceMeters)} m` }}</span>
       </div>
     </div>
 
@@ -299,7 +302,8 @@ function shouldShowPrimaryDetails() {
   align-items: center;
   gap: 10px;
   transform: translate(-50%, -50%);
-  transition: left 0.12s linear, top 0.12s linear, opacity 0.12s linear;
+  transition: left 0.24s ease-out, top 0.24s ease-out, opacity 0.18s linear;
+  z-index: 2;
 }
 
 .ar-marker-dot {
@@ -361,6 +365,15 @@ function shouldShowPrimaryDetails() {
   box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.18);
 }
 
+.ar-marker--pinned-target {
+  opacity: 0.94 !important;
+}
+
+.ar-marker--pinned-target .ar-marker-label {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.78);
+}
+
 .guided-tour-status {
   position: absolute;
   top: 24px;
@@ -370,6 +383,7 @@ function shouldShowPrimaryDetails() {
   border-radius: 12px;
   display: grid;
   gap: 10px;
+  z-index: 3;
 }
 
 .guided-tour-status-header {
@@ -443,6 +457,7 @@ function shouldShowPrimaryDetails() {
   display: grid;
   gap: 6px;
   pointer-events: auto;
+  z-index: 3;
 }
 
 .ar-empty-state strong,
@@ -473,6 +488,7 @@ function shouldShowPrimaryDetails() {
   appearance: none;
   cursor: pointer;
   pointer-events: auto;
+  z-index: 3;
 }
 
 .ar-primary-hint {

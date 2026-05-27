@@ -13,6 +13,7 @@ export type CampusArMarker = {
   x: number
   y: number
   confidence: number
+  isPinnedTarget?: boolean
 }
 
 export type CampusArBuildingDistance = {
@@ -477,6 +478,7 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
     }
 
     const verticalFov = computeVerticalFovDegrees(viewport.width, viewport.height)
+    const shouldPinSingleTarget = buildings.value.length === 1
     const visibleMarkers = buildings.value
       .map((building) => {
         const distanceMeters = computeDistanceMeters(userFix.value as GeoFix, building)
@@ -488,12 +490,19 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
         const isWithinVerticalFov = Math.abs(relativePitch) <= verticalFov / 2 + 10
         const isNearby = distanceMeters <= MAX_VISIBLE_DISTANCE_METERS
 
-        if (!isWithinHorizontalFov || !isWithinVerticalFov || !isNearby) {
+        if ((!isWithinHorizontalFov || !isWithinVerticalFov || !isNearby) && !shouldPinSingleTarget) {
           return null
         }
 
-        const x = ((relativeBearing + DEFAULT_HORIZONTAL_FOV / 2) / DEFAULT_HORIZONTAL_FOV) * viewport.width
-        const y = ((verticalFov / 2 - relativePitch) / verticalFov) * viewport.height
+        const isPinnedTarget = shouldPinSingleTarget && (!isWithinHorizontalFov || !isWithinVerticalFov || !isNearby)
+        const projectedBearing = isPinnedTarget
+          ? clamp(relativeBearing, -DEFAULT_HORIZONTAL_FOV / 2, DEFAULT_HORIZONTAL_FOV / 2)
+          : relativeBearing
+        const projectedPitch = isPinnedTarget
+          ? clamp(relativePitch, -verticalFov / 2, verticalFov / 2)
+          : relativePitch
+        const x = ((projectedBearing + DEFAULT_HORIZONTAL_FOV / 2) / DEFAULT_HORIZONTAL_FOV) * viewport.width
+        const y = ((verticalFov / 2 - projectedPitch) / verticalFov) * viewport.height
         const confidenceBase =
           1 -
           clamp(
@@ -513,7 +522,8 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
           relativeBearing,
           x: clamp(x, 36, viewport.width - 36),
           y: clamp(y, 88, viewport.height - 220),
-          confidence: clamp(confidenceBase, 0.2, 1)
+          confidence: isPinnedTarget ? 0.88 : clamp(confidenceBase, 0.2, 1),
+          isPinnedTarget
         }
       })
       .filter((marker): marker is CampusArMarker => marker !== null)
