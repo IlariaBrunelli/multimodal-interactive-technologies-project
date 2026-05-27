@@ -61,6 +61,7 @@ type BuildingHistoricalDetailsRow = {
 type GuidedTourRow = CampusBuildingRow & {
   id?: string | number | null
   building_id?: string | number | null
+  buildingId?: string | number | null
   storytelling?: string | null
   step?: number | string | null
   building?: CampusBuildingRow | null
@@ -651,9 +652,26 @@ function normalizeSearchValue(value: string | number | null | undefined) {
   return String(value ?? '').trim().toLowerCase()
 }
 
+function getGuidedTourBuildingId(row: GuidedTourRow) {
+  const dynamicRow = row as Record<string, unknown>
+  const value =
+    row.building_id ??
+    row.buildingId ??
+    dynamicRow.buildingID ??
+    dynamicRow.building_id_uuid ??
+    dynamicRow['building.id'] ??
+    row.building?.id ??
+    row.buildings?.id ??
+    row.campus_buildings?.id ??
+    null
+
+  return value === null || typeof value === 'undefined' ? null : String(value)
+}
+
 function mapGuidedTourBuilding(row: GuidedTourRow) {
-  const linkedBuilding = row.building_id
-    ? arBuildings.value.find((building) => building.id === String(row.building_id))
+  const buildingId = getGuidedTourBuildingId(row)
+  const linkedBuilding = buildingId
+    ? arBuildings.value.find((building) => building.id === buildingId)
     : null
 
   if (linkedBuilding) {
@@ -684,7 +702,7 @@ function mapGuidedTourBuilding(row: GuidedTourRow) {
 
   return mapCampusBuildingRow({
     ...row,
-    id: row.building_id ?? row.id
+    id: buildingId ?? row.id
   })
 }
 
@@ -722,8 +740,12 @@ async function loadGuidedTour() {
 
     try {
       await loadCampusBuildings()
+      const supabase = useSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
 
       const response = await $fetch<GuidedTourStepsResponse>('/api/guided-tour-steps', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         timeout: 70000
       })
       const rows = Array.isArray(response.steps) ? response.steps : []

@@ -79,27 +79,71 @@ async function fetchGuidedTourWebhook(webhookUrl: string) {
   }
 }
 
+async function fetchGuidedTourSupabase(event: any) {
+  const config = useRuntimeConfig(event)
+  const supabaseUrl = config.public.supabaseUrl
+  const supabaseAnonKey = config.public.supabaseAnonKey
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return []
+  }
+
+  const authHeader = getHeader(event, 'authorization')
+  const headers: Record<string, string> = {
+    apikey: supabaseAnonKey,
+    Authorization: authHeader || `Bearer ${supabaseAnonKey}`
+  }
+
+  const rows = await $fetch<unknown>(`${supabaseUrl}/rest/v1/guided_tour`, {
+    method: 'GET',
+    headers,
+    query: {
+      select: 'id,building_id,step,storytelling',
+      order: 'step.asc'
+    },
+    timeout: 30000
+  })
+
+  return unwrapGuidedTourRows(rows)
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const webhookUrl = config.n8nGuidedTourStepsWebhook
 
-  if (!webhookUrl) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'N8N_GUIDED_TOUR_STEPS_WEBHOOK is not configured'
-    })
+  let webhookError: any = null
+
+  try {
+    if (webhookUrl) {
+      const webhookResponse = await fetchGuidedTourWebhook(webhookUrl)
+      const steps = unwrapGuidedTourRows(webhookResponse)
+
+      if (steps.length > 0) {
+        return { steps, source: 'webhook' }
+      }
+    }
+  } catch (error: any) {
+    webhookError = error
+    console.warn('Guided tour webhook failed. Falling back to Supabase.', error)
   }
 
   try {
-    const webhookResponse = await fetchGuidedTourWebhook(webhookUrl)
-    const steps = unwrapGuidedTourRows(webhookResponse)
+    const steps = await fetchGuidedTourSupabase(event)
 
-    return { steps }
+    if (steps.length > 0) {
+      return { steps, source: 'supabase' }
+    }
+
+    if (webhookError) {
+      throw webhookError
+    }
+
+    return { steps: [], source: 'empty' }
   } catch (error: any) {
     console.error('Guided tour webhook error:', error)
     throw createError({
       statusCode: 502,
-      statusMessage: `Guided tour webhook error: ${error.message || 'Unknown error'}`
+      statusMessage: `Guided tour load error: ${error.message || 'Unknown error'}`
     })
   }
 })
