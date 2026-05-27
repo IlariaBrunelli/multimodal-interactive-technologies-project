@@ -140,14 +140,11 @@ const emptyState = computed(() => {
     }
   }
 
-  if (props.isGuidedTourActive && guidedTourBuildingLabel.value && props.markers.length === 0) {
-    return {
-      title: 'Find the next stop',
-      detail: `Move toward ${guidedTourBuildingLabel.value}. This step completes within ${guidedTourCompletionRadius.value} meters.`
-    }
-  }
-
   if (props.markers.length === 0) {
+    if (props.isGuidedTourActive) {
+      return null
+    }
+
     return {
       title: 'No building anchor in view',
       detail: 'Move closer to a mapped building within 160 meters or verify the Supabase building coordinates.'
@@ -202,7 +199,11 @@ function shouldShowPrimaryDetails() {
         opacity: marker.confidence.toFixed(2)
       }"
     >
-      <div class="ar-marker-dot" :style="{ backgroundColor: marker.color }"></div>
+      <div
+        class="ar-marker-dot"
+        :class="{ 'ar-marker-dot--guided': isGuidedTourActive }"
+        :style="{ backgroundColor: isGuidedTourActive ? '#ef4444' : marker.color }"
+      ></div>
       <div class="ar-marker-label">
         <strong>{{ marker.name }}</strong>
         <span>{{ Math.round(marker.distanceMeters) }} m</span>
@@ -212,7 +213,10 @@ function shouldShowPrimaryDetails() {
     <div v-if="isGuidedTourActive" class="guided-tour-status">
       <div class="guided-tour-status-header">
         <span>Guided Tour</span>
-        <strong>{{ guidedTourNsteps }} / {{ guidedTourTotalSteps }}</strong>
+        <strong>
+          <span class="guided-tour-pin" aria-hidden="true"></span>
+          {{ guidedTourNsteps }} / {{ guidedTourTotalSteps }}
+        </strong>
       </div>
       <div v-if="isGuidedTourComplete" class="guided-tour-status-body">
         <strong>Tour complete</strong>
@@ -299,12 +303,33 @@ function shouldShowPrimaryDetails() {
 }
 
 .ar-marker-dot {
+  position: relative;
   width: 14px;
   height: 14px;
   border-radius: 999px;
   border: 2px solid rgba(255, 255, 255, 0.96);
   box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
+}
+
+.ar-marker-dot--guided {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px 999px 999px 4px;
+  transform: rotate(-45deg);
+  box-shadow: 0 0 0 7px rgba(239, 68, 68, 0.18);
+}
+
+.ar-marker-dot--guided::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #fff;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .ar-marker-label {
@@ -332,6 +357,10 @@ function shouldShowPrimaryDetails() {
   box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.14);
 }
 
+.ar-marker--primary .ar-marker-dot--guided {
+  box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.18);
+}
+
 .guided-tour-status {
   position: absolute;
   top: 24px;
@@ -356,9 +385,34 @@ function shouldShowPrimaryDetails() {
 }
 
 .guided-tour-status-header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: #f8fafc;
   font-size: 1rem;
   letter-spacing: 0;
+}
+
+.guided-tour-pin {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px 999px 999px 3px;
+  background: #ef4444;
+  transform: rotate(-45deg);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+.guided-tour-pin::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #fff;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .guided-tour-status-body {
@@ -380,9 +434,9 @@ function shouldShowPrimaryDetails() {
 
 .ar-empty-state {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  left: 24px;
+  top: 96px;
+  transform: none;
   width: min(340px, calc(100vw - 36px));
   padding: 14px 16px;
   border-radius: 12px;
@@ -406,7 +460,8 @@ function shouldShowPrimaryDetails() {
 .ar-primary-card {
   position: absolute;
   left: 24px;
-  bottom: max(340px, 42vh);
+  top: 96px;
+  bottom: auto;
   width: min(320px, calc(100vw - 36px));
   padding: 12px 14px;
   border-radius: 12px;
@@ -480,8 +535,16 @@ function shouldShowPrimaryDetails() {
   .ar-primary-card {
     left: 12px;
     right: 12px;
+    top: 154px;
     width: auto;
-    bottom: max(360px, 44vh);
+    bottom: auto;
+  }
+
+  .ar-empty-state {
+    left: 12px;
+    right: 12px;
+    top: 154px;
+    width: auto;
   }
 
   .ar-error-banner {

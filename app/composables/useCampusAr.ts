@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, reactive, ref, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import type { CampusBuilding } from '~/data/campusBuildings'
 
 export type ArPermissionState = 'idle' | 'prompt' | 'granted' | 'denied' | 'unsupported'
@@ -61,6 +61,7 @@ const DEFAULT_HORIZONTAL_FOV = 58
 const MAX_VISIBLE_DISTANCE_METERS = 160
 const MARKER_ALTITUDE_OFFSET_METERS = 25
 const SENSOR_PERMISSION_TIMEOUT_MS = 10000
+const PRIMARY_MARKER_SWITCH_MARGIN = 8
 
 export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>) {
   const buildings = computed(() => toValue(buildingsSource))
@@ -453,6 +454,10 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
     stopResizeWatch()
   }
 
+  function scoreMarker(marker: CampusArMarker) {
+    return Math.abs(marker.relativeBearing) * 1.8 + marker.distanceMeters * 0.08
+  }
+
   const buildingDistances = computed<CampusArBuildingDistance[]>(() => {
     if (!userFix.value) {
       return []
@@ -522,7 +527,43 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
     return visibleMarkers.slice(0, 6)
   })
 
-  const primaryMarker = computed(() => markers.value[0] ?? null)
+  const primaryMarkerId = ref<string | null>(null)
+
+  watch(
+    markers,
+    (nextMarkers) => {
+      if (nextMarkers.length === 0) {
+        primaryMarkerId.value = null
+        return
+      }
+
+      const bestMarker = nextMarkers[0]
+      const currentMarker = primaryMarkerId.value
+        ? nextMarkers.find((marker) => marker.id === primaryMarkerId.value)
+        : null
+
+      if (!currentMarker) {
+        primaryMarkerId.value = bestMarker.id
+        return
+      }
+
+      const bestScore = scoreMarker(bestMarker)
+      const currentScore = scoreMarker(currentMarker)
+
+      if (bestMarker.id !== currentMarker.id && bestScore + PRIMARY_MARKER_SWITCH_MARGIN < currentScore) {
+        primaryMarkerId.value = bestMarker.id
+      }
+    },
+    { immediate: true }
+  )
+
+  const primaryMarker = computed(() => {
+    if (!primaryMarkerId.value) {
+      return null
+    }
+
+    return markers.value.find((marker) => marker.id === primaryMarkerId.value) ?? markers.value[0] ?? null
+  })
 
   const status = computed<CampusArStatus>(() => ({
     heading: pose.value.heading,
