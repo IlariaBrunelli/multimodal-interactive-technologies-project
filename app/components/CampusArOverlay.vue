@@ -19,6 +19,7 @@ const props = defineProps<{
   guidedTourNsteps?: number
   guidedTourTotalSteps?: number
   guidedTourCurrentName?: string | null
+  guidedTourCurrentAlias?: string | null
   guidedTourCurrentStorytelling?: string | null
   guidedTourCurrentDistanceMeters?: number | null
   guidedTourCompletionRadiusMeters?: number
@@ -39,6 +40,16 @@ const isGuidedTourComplete = computed(() => (
   guidedTourNsteps.value >= guidedTourTotalSteps.value
 ))
 const guidedTourStepNumber = computed(() => Math.min(guidedTourNsteps.value + 1, guidedTourTotalSteps.value))
+const guidedTourBuildingLabel = computed(() => {
+  const name = props.guidedTourCurrentName?.trim()
+  const alias = props.guidedTourCurrentAlias?.trim()
+
+  if (name && alias) {
+    return `${name} - ${alias}`
+  }
+
+  return name || alias || null
+})
 const guidedTourDistanceLabel = computed(() => {
   if (
     props.guidedTourCurrentDistanceMeters === null ||
@@ -129,10 +140,10 @@ const emptyState = computed(() => {
     }
   }
 
-  if (props.isGuidedTourActive && props.guidedTourCurrentName && props.markers.length === 0) {
+  if (props.isGuidedTourActive && guidedTourBuildingLabel.value && props.markers.length === 0) {
     return {
       title: 'Find the next stop',
-      detail: `Move toward ${props.guidedTourCurrentName}. This step completes within ${guidedTourCompletionRadius.value} meters.`
+      detail: `Move toward ${guidedTourBuildingLabel.value}. This step completes within ${guidedTourCompletionRadius.value} meters.`
     }
   }
 
@@ -209,7 +220,7 @@ function shouldShowPrimaryDetails() {
       </div>
       <div v-else class="guided-tour-status-body">
         <span v-if="guidedTourTotalSteps > 0">Step {{ guidedTourStepNumber }} of {{ guidedTourTotalSteps }}</span>
-        <strong>{{ guidedTourCurrentName ?? 'Loading next stop' }}</strong>
+        <strong>{{ guidedTourBuildingLabel ?? 'Loading next stop' }}</strong>
         <span v-if="guidedTourCurrentStorytelling">{{ guidedTourCurrentStorytelling }}</span>
         <span v-if="guidedTourDistanceLabel">
           {{ guidedTourDistanceLabel }} - complete within {{ guidedTourCompletionRadius }} m

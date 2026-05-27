@@ -5,6 +5,7 @@ export type CampusBuilding = {
   longitude: number
   altitude?: number
   labelAltitude?: number
+  alias?: string
   color?: string
 }
 

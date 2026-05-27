@@ -39,6 +39,7 @@ type CampusChatResponse = {
 type CampusBuildingRow = {
   id?: string | number | null
   name?: string | null
+  alias?: string | null
   title?: string | null
   building_name?: string | null
   latitude?: number | string | null
@@ -60,7 +61,6 @@ type BuildingHistoricalDetailsRow = {
 type GuidedTourRow = CampusBuildingRow & {
   id?: string | number | null
   building_id?: string | number | null
-  description?: string | null
   storytelling?: string | null
   step?: number | string | null
   building?: CampusBuildingRow | null
@@ -580,6 +580,7 @@ function mapCampusBuildingRow(row: CampusBuildingRow): CampusBuilding | null {
     longitude,
     altitude: parseCoordinateValue(row.altitude, 0),
     labelAltitude: parseCoordinateValue(row.label_altitude ?? row.labelAltitude, 12),
+    alias: row.alias?.trim() || undefined,
     color: row.color ?? undefined
   }
 }
@@ -646,6 +647,10 @@ function parseGuidedTourOrder(value: number | string | null | undefined, fallbac
   return Number.isFinite(parsedValue) ? parsedValue : fallback
 }
 
+function normalizeSearchValue(value: string | number | null | undefined) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
 function mapGuidedTourBuilding(row: GuidedTourRow) {
   const linkedBuilding = row.building_id
     ? arBuildings.value.find((building) => building.id === String(row.building_id))
@@ -659,6 +664,22 @@ function mapGuidedTourBuilding(row: GuidedTourRow) {
 
   if (embeddedBuilding) {
     return mapCampusBuildingRow(embeddedBuilding)
+  }
+
+  const rowName = normalizeSearchValue(row.name ?? row.title ?? row.building_name)
+  const rowAlias = normalizeSearchValue(row.alias)
+  const matchedBuilding = arBuildings.value.find((building) => {
+    const buildingName = normalizeSearchValue(building.name)
+    const buildingAlias = normalizeSearchValue(building.alias)
+
+    return (
+      (rowName && (rowName === buildingName || rowName === buildingAlias)) ||
+      (rowAlias && (rowAlias === buildingAlias || rowAlias === buildingName))
+    )
+  })
+
+  if (matchedBuilding) {
+    return matchedBuilding
   }
 
   return mapCampusBuildingRow({
@@ -680,7 +701,7 @@ function mapGuidedTourRows(rows: GuidedTourRow[]) {
       return {
         id: String(row.id ?? `${building.id}-${index}`),
         order: parseGuidedTourOrder(row.step, index + 1),
-        storytelling: row.storytelling?.trim() || row.description?.trim() || null,
+        storytelling: row.storytelling?.trim() || null,
         building
       }
     })
@@ -1076,6 +1097,7 @@ onBeforeUnmount(() => {
       :camera-permission-state="cameraPermissionState"
       :enabled="isArMode"
       :guided-tour-completion-radius-meters="GUIDED_TOUR_COMPLETION_RADIUS_METERS"
+      :guided-tour-current-alias="activeGuidedTourStep?.building.alias ?? null"
       :guided-tour-current-distance-meters="activeGuidedTourDistanceMeters"
       :guided-tour-current-name="activeGuidedTourStep?.building.name ?? null"
       :guided-tour-current-storytelling="activeGuidedTourStep?.storytelling ?? null"
