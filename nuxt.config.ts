@@ -12,6 +12,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     n8nCampusChatWebhook: process.env.N8N_CAMPUS_CHAT_WEBHOOK || '',
+    n8nCampusDataWebhook:
+      process.env.N8N_CAMPUS_DATA_WEBHOOK ||
+      'http://localhost:5678/webhook/get-campus-data',
     n8nGuidedTourStepsWebhook:
       process.env.N8N_GUIDED_TOUR_STEPS_WEBHOOK ||
       'http://localhost:5678/webhook/get-guided-tour-steps',

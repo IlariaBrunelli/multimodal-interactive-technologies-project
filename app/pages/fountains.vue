@@ -23,8 +23,7 @@ type NearestFountainsRequestBody = {
   action: 'get_nearest_fountains'
   data: string
 }
-
-const nearestFountainsEndpoint = 'http://localhost:5678/webhook/get-campus-data'
+const nearestFountainsEndpoint = '/api/campus-data'
 
 const locationState = ref<LocationState>('idle')
 const locationError = ref<string | null>(null)

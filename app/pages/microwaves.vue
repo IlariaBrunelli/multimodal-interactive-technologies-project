@@ -23,8 +23,7 @@ type NearestMicrowavesRequestBody = {
   action: 'get_nearest_microwaves'
   data: string
 }
-
-const nearestMicrowavesEndpoint = 'http://localhost:5678/webhook/get-campus-data'
+const nearestMicrowavesEndpoint = '/api/campus-data'
 
 const locationState = ref<LocationState>('idle')
 const locationError = ref<string | null>(null)

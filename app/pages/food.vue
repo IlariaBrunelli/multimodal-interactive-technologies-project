@@ -22,8 +22,7 @@ type NearestFoodRequestBody = {
   action: 'get_nearest_food_and_drinks'
   data: string
 }
-
-const nearestFoodEndpoint = 'http://localhost:5678/webhook/get-campus-data'
+const nearestFoodEndpoint = '/api/campus-data'
 
 const locationState = ref<LocationState>('idle')
 const locationError = ref<string | null>(null)

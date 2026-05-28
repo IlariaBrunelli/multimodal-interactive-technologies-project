@@ -23,8 +23,7 @@ type NearestPlugsRequestBody = {
   action: 'get_nearest_plugs'
   data: string
 }
-
-const nearestPlugsEndpoint = 'http://localhost:5678/webhook/get-campus-data'
+const nearestPlugsEndpoint = '/api/campus-data'
 
 const locationState = ref<LocationState>('idle')
 const locationError = ref<string | null>(null)
