@@ -8,7 +8,7 @@ function extractBearerToken(event: H3Event) {
   if (!authorizationHeader?.startsWith('Bearer ')) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Login required to access the calendar assistant'
+      statusMessage: 'Login required to access the AI assistant'
     })
   }
 

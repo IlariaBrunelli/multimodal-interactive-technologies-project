@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { Session } from '@supabase/supabase-js'
 import type { ArPermissionState, CampusArPosition } from '~/composables/useCampusAr'
 import type { CampusBuilding } from '~/data/campusBuildings'
 import { getChatLocationCoordinates } from '~/composables/useChatLocation'
@@ -177,6 +178,22 @@ const userPrompt = ref('')
 
 // Stato di caricamento della chat mentre aspettiamo la risposta dell'agente n8n.
 const isChatLoading = ref(false)
+const authClient = useSupabaseClient()
+const currentAuthSession = ref<Session | null>(null)
+const isAuthReady = ref(false)
+const isAssistantAvailable = computed(() => Boolean(currentAuthSession.value?.user))
+const chatInputPlaceholder = computed(() => {
+  if (!isAuthReady.value) {
+    return 'Checking your account...'
+  }
+
+  if (!isAssistantAvailable.value) {
+    return 'Sign in to use the AI Assistant'
+  }
+
+  return isChatLoading.value ? 'Waiting for the response...' : 'Ask something about campus...'
+})
+let authSubscription: { unsubscribe: () => void } | null = null
 
 // Chiave usata per mantenere la stessa sessione n8n nello stesso browser.
 const campusChatSessionStorageKey = 'campus-ai-assistant-session-id'
@@ -433,6 +450,10 @@ function answerCampusQuestion(question: string) {
 
 // Questa funzione viene usata quando l'utente clicca un suggerimento.
 function useStarterPrompt(prompt: string) {
+  if (!isAssistantAvailable.value) {
+    return
+  }
+
   // Copia il suggerimento dentro l'input.
   userPrompt.value = prompt
   // Invia subito la domanda come se l'utente avesse premuto Send.
@@ -447,6 +468,10 @@ function getSpeechRecognition() {
 }
 
 function startMicrophone() {
+  if (!isAssistantAvailable.value) {
+    return
+  }
+
   const SpeechConstructor = getSpeechRecognition()
   if (!SpeechConstructor) {
     // Fallback for browsers like Zen/Firefox that lack native SpeechRecognition engine
@@ -525,6 +550,10 @@ function stopMicrophone() {
 }
 
 function toggleMicrophone() {
+  if (!isAssistantAvailable.value) {
+    return
+  }
+
   if (isListening.value) {
     stopMicrophone()
   } else {
@@ -1072,7 +1101,7 @@ async function submitChat() {
   const question = userPrompt.value.trim()
 
   // Se dopo trim non rimane testo, usciamo dalla funzione.
-  if (!question || isChatLoading.value) {
+  if (!isAssistantAvailable.value || !question || isChatLoading.value) {
     return
   }
 
@@ -1142,15 +1171,32 @@ async function submitChat() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadCampusBuildings()
   nextTick(handleChatScroll)
   window.addEventListener('resize', handleChatScroll)
+
+  const { data } = await authClient.auth.getSession()
+  currentAuthSession.value = data.session ?? null
+  isAuthReady.value = true
+
+  const authListener = authClient.auth.onAuthStateChange((_event, session) => {
+    currentAuthSession.value = session
+    isAuthReady.value = true
+
+    if (!session) {
+      stopMicrophone()
+      userPrompt.value = ''
+    }
+  })
+
+  authSubscription = authListener.data.subscription
 })
 
 // onBeforeUnmount viene eseguito quando il componente sta per essere rimosso dalla pagina.
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleChatScroll)
+  authSubscription?.unsubscribe()
   stopMicrophone()
   disableArMode()
 
@@ -1227,7 +1273,7 @@ onBeforeUnmount(() => {
     </button>
 
     <!-- Pulsante Login -->
-    <NuxtLink :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'" aria-label="Open login page" class="login-link transition-opacity duration-500" to="/login">
+    <NuxtLink :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'" aria-label="Open account page" class="login-link transition-opacity duration-500" to="/login">
       <svg aria-hidden="true" viewBox="0 0 24 24">
         <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
       </svg>
@@ -1439,12 +1485,20 @@ onBeforeUnmount(() => {
           <div class="ai-assistant-block">
             <div class="chatbot-heading">
               <h2 id="campus-ai-title">Campus AI Assistant</h2>
+              <NuxtLink
+                v-if="isAuthReady && !isAssistantAvailable"
+                class="chat-auth-notice"
+                to="/login"
+              >
+                You must be logged in to use the AI Assistant
+              </NuxtLink>
             </div>
             
             <div aria-label="Suggested prompts" class="prompt-list">
               <button
                 v-for="prompt in starterPrompts"
                 :key="prompt"
+                :disabled="!isAssistantAvailable"
                 class="prompt-chip"
                 type="button"
                 @click="useStarterPrompt(prompt)"
@@ -1483,6 +1537,7 @@ onBeforeUnmount(() => {
               :aria-label="isListening ? 'Stop recording' : 'Enable microphone'"
               :aria-pressed="isListening"
               :class="{ 'chatbot-mic-button--listening': isListening }"
+              :disabled="!isAssistantAvailable"
               class="chatbot-mic-button"
               type="button"
               @click="toggleMicrophone"
@@ -1497,12 +1552,12 @@ onBeforeUnmount(() => {
             <input
               id="campus-ai-input"
               v-model="userPrompt"
-              :disabled="isChatLoading"
-              :placeholder="isChatLoading ? 'Attendo la risposta...' : 'Chiedi qualcosa sulle lezioni...'"
+              :disabled="isChatLoading || !isAssistantAvailable"
+              :placeholder="chatInputPlaceholder"
               class="chatbot-input"
               type="text"
             >
-            <button :disabled="isChatLoading" class="chatbot-send" type="submit">
+            <button :disabled="isChatLoading || !isAssistantAvailable" class="chatbot-send" type="submit">
               <svg v-if="!isChatLoading" class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                 <line x1="22" x2="11" y1="2" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -1967,6 +2022,19 @@ onBeforeUnmount(() => {
   color: #102C53;
 }
 
+.chat-auth-notice {
+  max-width: 310px;
+  padding: 7px 10px;
+  border: 1px solid rgba(16, 44, 83, 0.16);
+  border-radius: 999px;
+  color: #102C53;
+  background: rgba(219, 234, 254, 0.62);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+}
+
 .prompt-list {
   display: flex;
   flex-wrap: wrap;
@@ -1988,6 +2056,13 @@ onBeforeUnmount(() => {
 .prompt-chip:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 22px rgba(16, 44, 83, 0.18);
+}
+
+.prompt-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+  box-shadow: none;
 }
 
 .chatbot-window {
@@ -2073,6 +2148,11 @@ onBeforeUnmount(() => {
   border-color: rgba(16, 44, 83, 0.45);
 }
 
+.chatbot-mic-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .chatbot-mic-button--listening {
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.4);
@@ -2110,7 +2190,7 @@ onBeforeUnmount(() => {
 }
 
 .chatbot-input:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.72;
 }
 
@@ -2128,7 +2208,7 @@ onBeforeUnmount(() => {
 }
 
 .chatbot-send:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.72;
 }
 

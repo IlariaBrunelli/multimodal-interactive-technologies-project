@@ -1,3 +1,5 @@
+import { getAuthenticatedSupabaseUser } from '../utils/authenticated-supabase'
+
 type CampusChatRequestBody = {
   message?: string
   sessionId?: string
@@ -22,6 +24,8 @@ function parseOptionalCoordinate(value: number | string | null | undefined) {
 }
 
 export default defineEventHandler(async (event) => {
+  await getAuthenticatedSupabaseUser(event)
+
   const config = useRuntimeConfig(event)
   const webhookUrl = config.n8nCampusChatWebhook
 
