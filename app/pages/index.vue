@@ -270,6 +270,9 @@ watch(() => primaryArMarker.value?.id, (newId, oldId) => {
 const isSheetDragging = ref(false)
 const sheetDragY = ref(0)
 const maxDragDistance = 250 // Altezza cumulativa per chiudere services e hero text
+const chatbotCard = ref<HTMLElement | null>(null)
+const AR_SHEET_COLLAPSED_VISIBLE_HEIGHT = 72
+const AR_SHEET_REOPEN_DRAG_THRESHOLD = 56
 
 const sheetProgress = computed(() => {
   return Math.max(0, Math.min(1, -sheetDragY.value / maxDragDistance))
@@ -277,6 +280,21 @@ const sheetProgress = computed(() => {
 
 let dragStartY = 0
 let currentDragY = 0
+let maxSheetDragDown = 0
+
+function getArSheetMaxDown() {
+  if (!import.meta.client || !chatbotCard.value) {
+    return 0
+  }
+
+  const renderedTranslateY = Math.max(sheetDragY.value, 0)
+  const cardTopWithoutTransform = chatbotCard.value.getBoundingClientRect().top - renderedTranslateY
+
+  return Math.max(
+    0,
+    window.innerHeight - AR_SHEET_COLLAPSED_VISIBLE_HEIGHT - cardTopWithoutTransform
+  )
+}
 
 function onSheetPointerDown(e: PointerEvent) {
   // Solo tasto sinistro per mouse
@@ -285,6 +303,7 @@ function onSheetPointerDown(e: PointerEvent) {
   isSheetDragging.value = true
   dragStartY = e.clientY
   currentDragY = sheetDragY.value
+  maxSheetDragDown = getArSheetMaxDown()
 
   const target = e.currentTarget as HTMLElement
   target.setPointerCapture(e.pointerId)
@@ -297,8 +316,7 @@ function onSheetPointerDown(e: PointerEvent) {
     if (!isArMode.value) {
       if (newY > 0) newY = 0 // Limita verso il basso in normal mode
     } else {
-      const maxDown = window.innerHeight - 200
-      if (newY > maxDown) newY = maxDown // Allow dragging down in AR mode
+      if (newY > maxSheetDragDown) newY = maxSheetDragDown
     }
     
     sheetDragY.value = newY
@@ -312,8 +330,12 @@ function onSheetPointerDown(e: PointerEvent) {
     
     // Snap automatico
     if (isArMode.value) {
-      if (sheetDragY.value > 100) {
-        sheetDragY.value = window.innerHeight - 200 // Snap to hidden at bottom
+      const dragDelta = sheetDragY.value - currentDragY
+
+      if (currentDragY > 100 && dragDelta < -AR_SHEET_REOPEN_DRAG_THRESHOLD) {
+        sheetDragY.value = 0
+      } else if (sheetDragY.value > 100) {
+        sheetDragY.value = getArSheetMaxDown()
       } else if (sheetDragY.value < -100) {
         sheetDragY.value = -maxDragDistance // Snap to full height
       } else {
@@ -1380,7 +1402,8 @@ onBeforeUnmount(() => {
         aria-label="Campus AI Assistant"
         class="chatbot-section"
       >
-        <div 
+        <div
+          ref="chatbotCard"
           :class="{ 'chatbot-card--dragging': isSheetDragging, 'transition-all duration-300': !isSheetDragging }"
           :style="{ transform: (isArMode && sheetDragY > 0) ? `translateY(${sheetDragY}px)` : 'translateY(0px)' }"
           class="chatbot-card"
