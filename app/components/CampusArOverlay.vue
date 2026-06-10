@@ -27,6 +27,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  openMap: []
   requestAccess: []
   requestBuildingDetails: [buildingId: string]
 }>()
@@ -309,6 +310,22 @@ function shouldShowPrimaryDetails() {
       </div>
     </div>
 
+    <button
+      v-if="!isGuidedTourActive"
+      type="button"
+      class="ar-map-button"
+      :disabled="sensorStatus.locationPermissionState !== 'granted' || sensorStatus.locationAccuracyMeters === null"
+      @click="emit('openMap')"
+    >
+      <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+        <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Z" />
+        <path d="M9 3v15M15 6v15" />
+      </svg>
+      <span>
+        {{ sensorStatus.locationAccuracyMeters === null ? 'Locating for map...' : 'Open in map' }}
+      </span>
+    </button>
+
     <div v-if="emptyState" class="ar-empty-state">
       <strong>{{ emptyState.title }}</strong>
       <span>{{ emptyState.detail }}</span>
@@ -363,7 +380,8 @@ function shouldShowPrimaryDetails() {
 .ar-primary-card,
 .ar-empty-state,
 .guided-tour-status,
-.ar-error-banner {
+.ar-error-banner,
+.ar-map-button {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(15, 23, 42, 0.74);
   color: #f8fafc;
@@ -527,7 +545,7 @@ function shouldShowPrimaryDetails() {
 .ar-empty-state {
   position: absolute;
   left: 24px;
-  top: 96px;
+  top: 154px;
   transform: none;
   width: min(340px, calc(100vw - 36px));
   padding: 14px 16px;
@@ -553,7 +571,7 @@ function shouldShowPrimaryDetails() {
 .ar-primary-card {
   position: absolute;
   left: 24px;
-  top: 96px;
+  top: 154px;
   bottom: auto;
   width: min(320px, calc(100vw - 36px));
   padding: 12px 14px;
@@ -567,6 +585,39 @@ function shouldShowPrimaryDetails() {
   cursor: pointer;
   pointer-events: auto;
   z-index: 3;
+}
+
+.ar-map-button {
+  position: absolute;
+  left: 24px;
+  top: 96px;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 4;
+}
+
+.ar-map-button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.ar-map-button svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .ar-primary-hint {
@@ -639,6 +690,11 @@ function shouldShowPrimaryDetails() {
     right: 12px;
     top: 154px;
     width: auto;
+  }
+
+  .ar-map-button {
+    left: 12px;
+    top: 96px;
   }
 
   .ar-error-banner {

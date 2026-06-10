@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { ArPermissionState } from '~/composables/useCampusAr'
+import type { ArPermissionState, CampusArPosition } from '~/composables/useCampusAr'
 import type { CampusBuilding } from '~/data/campusBuildings'
 import { getChatLocationCoordinates } from '~/composables/useChatLocation'
 import { useCampusAr } from '~/composables/useCampusAr'
@@ -198,6 +198,8 @@ function toggleSpeak() {
 
 // AR Mode states per invocare la videocamera e collassare l'UI
 const isArMode = ref(false)
+const isArMapOpen = ref(false)
+const arMapPosition = ref<CampusArPosition | null>(null)
 const videoElement = ref<HTMLVideoElement | null>(null)
 let cameraStream: MediaStream | null = null
 const cameraPermissionState = ref<ArPermissionState>('idle')
@@ -232,6 +234,7 @@ const visibleArBuildings = computed(() => {
 const {
   buildingDistances: arBuildingDistances,
   markers: arMarkers,
+  position: arPosition,
   primaryMarker: primaryArMarker,
   status: arStatus,
   start: startCampusAr,
@@ -956,12 +959,27 @@ async function enableGuidedTourMode() {
 
 function disableArMode() {
   isArMode.value = false
+  isArMapOpen.value = false
+  arMapPosition.value = null
   isGuidedTourActive.value = false
   sheetDragY.value = 0
   guidedTourNsteps.value = 0
   clearSelectedArBuildingDetails()
   stopCampusAr()
   stopCamera()
+}
+
+function openArMap() {
+  if (!arPosition.value) {
+    return
+  }
+
+  arMapPosition.value = { ...arPosition.value }
+  isArMapOpen.value = true
+}
+
+function closeArMap() {
+  isArMapOpen.value = false
 }
 
 async function toggleArMode() {
@@ -1117,7 +1135,7 @@ onBeforeUnmount(() => {
       :building-historical-details="selectedArBuildingHistoricalDetails"
       :building-source-label="arBuildingSource"
       :camera-permission-state="cameraPermissionState"
-      :enabled="isArMode"
+      :enabled="isArMode && !isArMapOpen"
       :guided-tour-completion-radius-meters="GUIDED_TOUR_COMPLETION_RADIUS_METERS"
       :guided-tour-current-alias="activeGuidedTourStep?.building.alias ?? null"
       :guided-tour-current-distance-meters="activeGuidedTourDistanceMeters"
@@ -1135,8 +1153,14 @@ onBeforeUnmount(() => {
       :primary-marker="primaryArMarker"
       :selected-building-id="selectedArBuildingId"
       :sensor-status="arStatus"
+      @open-map="openArMap"
       @request-access="requestArAccess"
       @request-building-details="loadArBuildingHistoricalDetails"
+    />
+    <CampusMapOverlay
+      v-if="isArMapOpen && arMapPosition"
+      :position="arMapPosition"
+      @close="closeArMap"
     />
 
     <!-- Gradienti atmosferici originali -->

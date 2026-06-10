@@ -23,6 +23,12 @@ export type CampusArBuildingDistance = {
   bearing: number
 }
 
+export type CampusArPosition = {
+  latitude: number
+  longitude: number
+  accuracyMeters: number | null
+}
+
 export type CampusArStatus = {
   heading: number | null
   pitch: number | null
@@ -600,6 +606,18 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
     return markers.value.find((marker) => marker.id === primaryMarkerId.value) ?? markers.value[0] ?? null
   })
 
+  const position = computed<CampusArPosition | null>(() => {
+    if (!userFix.value) {
+      return null
+    }
+
+    return {
+      latitude: userFix.value.latitude,
+      longitude: userFix.value.longitude,
+      accuracyMeters: userFix.value.accuracy
+    }
+  })
+
   const status = computed<CampusArStatus>(() => ({
     heading: pose.value.heading,
     pitch: pose.value.pitch,
@@ -615,6 +633,7 @@ export function useCampusAr(buildingsSource: MaybeRefOrGetter<CampusBuilding[]>)
   return {
     buildingDistances,
     markers,
+    position,
     primaryMarker,
     status,
     ensureOrientationAccess,
