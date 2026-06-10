@@ -212,6 +212,7 @@ const selectedArBuildingId = ref<string | null>(null)
 const selectedArBuildingHistoricalDetails = ref<string | null>(null)
 const isLoadingArBuildingDetails = ref(false)
 const arBuildingDetailsError = ref<string | null>(null)
+let arBuildingDetailsRequestId = 0
 const CAMERA_PERMISSION_TIMEOUT_MS = 10000
 const GUIDED_TOUR_COMPLETION_RADIUS_METERS = 15
 const isGuidedTourActive = ref(false)
@@ -795,6 +796,12 @@ async function loadGuidedTour() {
 }
 
 async function loadArBuildingHistoricalDetails(buildingId: string) {
+  if (selectedArBuildingId.value === buildingId) {
+    clearSelectedArBuildingDetails()
+    return
+  }
+
+  const requestId = ++arBuildingDetailsRequestId
   selectedArBuildingId.value = buildingId
   selectedArBuildingHistoricalDetails.value = null
   arBuildingDetailsError.value = null
@@ -819,6 +826,11 @@ async function loadArBuildingHistoricalDetails(buildingId: string) {
     }
 
     const details = (data as BuildingHistoricalDetailsRow | null)?.historical_details?.trim()
+
+    if (requestId !== arBuildingDetailsRequestId || selectedArBuildingId.value !== buildingId) {
+      return
+    }
+
     selectedArBuildingHistoricalDetails.value = details || null
     if (isSpeakEnabled.value && import.meta.client) {
       window.speechSynthesis.cancel()
@@ -828,6 +840,10 @@ async function loadArBuildingHistoricalDetails(buildingId: string) {
       window.speechSynthesis.speak(utterance)
     }
   } catch (error) {
+    if (requestId !== arBuildingDetailsRequestId || selectedArBuildingId.value !== buildingId) {
+      return
+    }
+
     console.warn('Unable to load building historical details.', error)
     arBuildingDetailsError.value = 'Unable to load building details.'
     if (isSpeakEnabled.value && import.meta.client) {
@@ -837,7 +853,9 @@ async function loadArBuildingHistoricalDetails(buildingId: string) {
       window.speechSynthesis.speak(utterance)
     }
   } finally {
-    isLoadingArBuildingDetails.value = false
+    if (requestId === arBuildingDetailsRequestId) {
+      isLoadingArBuildingDetails.value = false
+    }
   }
 }
 
@@ -921,9 +939,11 @@ function stopCamera() {
 }
 
 function clearSelectedArBuildingDetails() {
+  arBuildingDetailsRequestId += 1
   selectedArBuildingId.value = null
   selectedArBuildingHistoricalDetails.value = null
   arBuildingDetailsError.value = null
+  isLoadingArBuildingDetails.value = false
 }
 
 async function requestArAccess() {
@@ -1160,6 +1180,7 @@ onBeforeUnmount(() => {
       :enabled="isArMode && !isArMapOpen"
       :guided-tour-completion-radius-meters="GUIDED_TOUR_COMPLETION_RADIUS_METERS"
       :guided-tour-current-alias="activeGuidedTourStep?.building.alias ?? null"
+      :guided-tour-current-building-id="activeGuidedTourBuilding?.id ?? null"
       :guided-tour-current-distance-meters="activeGuidedTourDistanceMeters"
       :guided-tour-current-name="activeGuidedTourStep?.building.name ?? null"
       :guided-tour-current-storytelling="activeGuidedTourStep?.storytelling ?? null"
@@ -1398,7 +1419,10 @@ onBeforeUnmount(() => {
 
       <!-- Sezione chatbot. -->
       <section
-        :class="{ 'chatbot-section--ar': isArMode }"
+        :class="{
+          'chatbot-section--ar': isArMode,
+          'chatbot-section--guided-details': isArMode && isGuidedTourActive && Boolean(selectedArBuildingId)
+        }"
         aria-label="Campus AI Assistant"
         class="chatbot-section"
       >
@@ -1869,6 +1893,10 @@ onBeforeUnmount(() => {
   transition: flex 0.3s ease, padding-top 0.3s ease;
 }
 
+.chatbot-section--guided-details {
+  padding-top: min(360px, 44dvh);
+}
+
 .chatbot-card {
   border-radius: 28px;
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -2158,6 +2186,11 @@ onBeforeUnmount(() => {
   .chatbot-section--ar {
     /* Keep the AR status card above the assistant sheet instead of over it. */
     padding-top: 166px;
+  }
+
+  .chatbot-section--guided-details {
+    /* Reserve room for the expanded guided-tour building description. */
+    padding-top: min(430px, 52dvh);
   }
 
   .chatbot-heading {

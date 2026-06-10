@@ -18,6 +18,7 @@ const props = defineProps<{
   isGuidedTourActive?: boolean
   guidedTourNsteps?: number
   guidedTourTotalSteps?: number
+  guidedTourCurrentBuildingId?: string | null
   guidedTourCurrentName?: string | null
   guidedTourCurrentAlias?: string | null
   guidedTourCurrentStorytelling?: string | null
@@ -258,6 +259,19 @@ function shouldShowAccessButton() {
 function shouldShowPrimaryDetails() {
   return props.primaryMarker?.id === props.selectedBuildingId
 }
+
+function shouldShowGuidedTourDetails() {
+  return Boolean(
+    props.guidedTourCurrentBuildingId &&
+    props.guidedTourCurrentBuildingId === props.selectedBuildingId
+  )
+}
+
+function requestGuidedTourBuildingDetails() {
+  if (!isGuidedTourComplete.value && props.guidedTourCurrentBuildingId) {
+    emit('requestBuildingDetails', props.guidedTourCurrentBuildingId)
+  }
+}
 </script>
 
 <template>
@@ -288,7 +302,17 @@ function shouldShowPrimaryDetails() {
       </div>
     </div>
 
-    <div v-if="isGuidedTourActive" class="guided-tour-status">
+    <button
+      v-if="isGuidedTourActive"
+      type="button"
+      class="guided-tour-status"
+      :class="{
+        'guided-tour-status--interactive': !isGuidedTourComplete && Boolean(guidedTourCurrentBuildingId),
+        'guided-tour-status--details': shouldShowGuidedTourDetails()
+      }"
+      :aria-expanded="shouldShowGuidedTourDetails()"
+      @click="requestGuidedTourBuildingDetails"
+    >
       <div class="guided-tour-status-header">
         <span>Guided Tour</span>
         <strong>
@@ -301,14 +325,36 @@ function shouldShowPrimaryDetails() {
         <span>All stops reached.</span>
       </div>
       <div v-else class="guided-tour-status-body">
-        <span v-if="guidedTourTotalSteps > 0">Step {{ guidedTourStepNumber }} of {{ guidedTourTotalSteps }}</span>
+        <div v-if="guidedTourTotalSteps > 0" class="guided-tour-step-instruction">
+          <span>Step {{ guidedTourStepNumber }} of {{ guidedTourTotalSteps }}</span>
+          <span>Move within {{ guidedTourCompletionRadius }} meters from the indicated building</span>
+        </div>
         <strong>{{ guidedTourBuildingLabel ?? 'Loading next stop' }}</strong>
         <span v-if="guidedTourCurrentStorytelling">{{ guidedTourCurrentStorytelling }}</span>
-        <span v-if="guidedTourDistanceLabel">
-          {{ guidedTourDistanceLabel }} - complete within {{ guidedTourCompletionRadius }} m
-        </span>
+        <div class="guided-tour-detail-summary">
+          <span v-if="guidedTourDistanceLabel">{{ guidedTourDistanceLabel }}</span>
+          <span
+            v-if="guidedTourCurrentBuildingId && !shouldShowGuidedTourDetails()"
+            class="ar-primary-hint"
+          >
+            Tap for details
+          </span>
+          <span v-else-if="isLoadingBuildingDetails" class="ar-primary-hint">Loading details...</span>
+          <span v-else-if="shouldShowGuidedTourDetails()" class="ar-primary-hint">Tap to close details</span>
+        </div>
+        <template v-if="shouldShowGuidedTourDetails() && !isLoadingBuildingDetails">
+          <span v-if="buildingDetailsError" class="ar-primary-detail ar-primary-detail--error">
+            {{ buildingDetailsError }}
+          </span>
+          <span v-else-if="buildingHistoricalDetails" class="ar-primary-detail">
+            {{ buildingHistoricalDetails }}
+          </span>
+          <span v-else class="ar-primary-detail">
+            No historical details available for this building.
+          </span>
+        </template>
       </div>
-    </div>
+    </button>
 
     <button
       v-if="!isGuidedTourActive"
@@ -341,7 +387,7 @@ function shouldShowPrimaryDetails() {
     </div>
 
     <button
-      v-if="primaryMarker"
+      v-if="primaryMarker && !isGuidedTourActive"
       type="button"
       class="ar-primary-card"
       @click="emit('requestBuildingDetails', primaryMarker.id)"
@@ -351,15 +397,18 @@ function shouldShowPrimaryDetails() {
       <span>Bearing {{ formatBearing(primaryMarker.bearing) }}</span>
       <span v-if="!shouldShowPrimaryDetails()" class="ar-primary-hint">Tap for details</span>
       <span v-else-if="isLoadingBuildingDetails" class="ar-primary-hint">Loading details...</span>
-      <span v-else-if="buildingDetailsError" class="ar-primary-detail ar-primary-detail--error">
-        {{ buildingDetailsError }}
-      </span>
-      <span v-else-if="buildingHistoricalDetails" class="ar-primary-detail">
-        {{ buildingHistoricalDetails }}
-      </span>
-      <span v-else class="ar-primary-detail">
-        No historical details available for this building.
-      </span>
+      <template v-else>
+        <span class="ar-primary-hint">Tap to close details</span>
+        <span v-if="buildingDetailsError" class="ar-primary-detail ar-primary-detail--error">
+          {{ buildingDetailsError }}
+        </span>
+        <span v-else-if="buildingHistoricalDetails" class="ar-primary-detail">
+          {{ buildingHistoricalDetails }}
+        </span>
+        <span v-else class="ar-primary-detail">
+          No historical details available for this building.
+        </span>
+      </template>
     </button>
 
     <div v-if="sensorStatus.errorMessage" class="ar-error-banner">
@@ -479,7 +528,16 @@ function shouldShowPrimaryDetails() {
   border-radius: 12px;
   display: grid;
   gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: left;
+  font: inherit;
+  appearance: none;
+  pointer-events: auto;
   z-index: 3;
+}
+
+.guided-tour-status--interactive {
+  cursor: pointer;
 }
 
 .guided-tour-status-header {
@@ -540,6 +598,30 @@ function shouldShowPrimaryDetails() {
   color: rgba(226, 232, 240, 0.92);
   font-size: 0.82rem;
   line-height: 1.35;
+}
+
+.guided-tour-step-instruction {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.guided-tour-step-instruction span:last-child {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.guided-tour-detail-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.guided-tour-detail-summary .ar-primary-hint {
+  margin-top: 0;
 }
 
 .ar-empty-state {
@@ -675,6 +757,12 @@ function shouldShowPrimaryDetails() {
     left: 12px;
     right: 12px;
     width: auto;
+    max-height: 176px;
+    overflow-y: auto;
+  }
+
+  .guided-tour-status--details {
+    max-height: min(360px, 46dvh);
   }
 
   .ar-primary-card {
@@ -690,6 +778,10 @@ function shouldShowPrimaryDetails() {
     right: 12px;
     top: 154px;
     width: auto;
+  }
+
+  .ar-primary-detail {
+    max-height: min(150px, 18dvh);
   }
 
   .ar-map-button {
