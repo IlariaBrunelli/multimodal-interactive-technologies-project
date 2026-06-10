@@ -31,7 +31,7 @@ const userPosition = ref<UserPosition | null>(null)
 const plugs = ref<PlugRow[]>([])
 const isLoading = ref(false)
 const fetchErrorMessage = ref<string | null>(null)
-const lastUpdatedAt = ref<number | null>(null)
+const servicePage = ref<HTMLElement | null>(null)
 
 let locationWatchId: number | null = null
 let lastRequestedPositionKey = ''
@@ -216,10 +216,6 @@ function formatDistance(distanceMeters: number | null) {
   return `${(distanceMeters / 1000).toFixed(distanceMeters < 10000 ? 2 : 1)} km`
 }
 
-function formatCoordinates(latitude: number, longitude: number) {
-  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
-}
-
 function stopLocationWatch() {
   if (!import.meta.client || locationWatchId === null) {
     return
@@ -304,8 +300,13 @@ async function loadNearestPlugs() {
     })
     console.log(response)
 
+    const scrollTop = servicePage.value?.scrollTop
     plugs.value = extractPlugRows(response)
-    lastUpdatedAt.value = Date.now()
+    await nextTick()
+
+    if (typeof scrollTop === 'number') {
+      servicePage.value?.scrollTo({ top: scrollTop })
+    }
   } catch (error) {
     fetchErrorMessage.value = extractErrorMessage(
       error,
@@ -314,10 +315,6 @@ async function loadNearestPlugs() {
   } finally {
     isLoading.value = false
   }
-}
-
-function refreshLocation() {
-  startLocationWatch()
 }
 
 const plugItems = computed(() => {
@@ -332,50 +329,9 @@ const loadError = computed(() => {
   return null
 })
 
-const locationStatusLabel = computed(() => {
-  switch (locationState.value) {
-    case 'requesting':
-      return 'Locating'
-    case 'granted':
-      return 'Live location'
-    case 'denied':
-      return 'Permission denied'
-    case 'unsupported':
-      return 'Unsupported'
-    case 'error':
-      return 'Location error'
-    default:
-      return 'Idle'
-  }
-})
-
-const locationStatusDetail = computed(() => {
-  if (locationState.value === 'granted' && userPosition.value?.accuracyMeters) {
-    return `Accuracy ${Math.round(userPosition.value.accuracyMeters)} m`
-  }
-
-  if (locationError.value) {
-    return locationError.value
-  }
-
-  if (locationState.value === 'requesting') {
-    return 'Waiting for a geolocation fix'
-  }
-
-  return 'Distance ranking starts after location access'
-})
-
-const lastUpdatedLabel = computed(() => {
-  if (!lastUpdatedAt.value) {
-    return 'Not loaded'
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  }).format(lastUpdatedAt.value)
-})
+function scrollToTop() {
+  servicePage.value?.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 watch(userPosition, (position) => {
   if (!position) {
@@ -407,18 +363,22 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="h-dvh overflow-y-auto bg-slate-50 text-slate-950">
+  <main ref="servicePage" class="h-dvh overflow-y-auto bg-slate-50 text-slate-950">
     <section class="mx-auto flex min-h-full max-w-6xl flex-col px-4 py-6 sm:px-6 lg:px-8">
-      <header class="shrink-0 border-b border-slate-200 pb-5">
+      <header
+        class="sticky top-0 z-20 shrink-0 cursor-pointer border-b border-slate-200 bg-slate-50/95 pb-5 backdrop-blur"
+        @click="scrollToTop"
+      >
         <NuxtLink
           to="/"
           class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+          @click.stop
         >
           <span aria-hidden="true">&larr;</span>
           <span>Back home</span>
         </NuxtLink>
 
-        <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="space-y-2">
             <p class="text-sm font-medium uppercase tracking-[0.16em] text-slate-500">Main Services</p>
             <h1 class="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Plugs</h1>
@@ -427,62 +387,25 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <div class="flex flex-wrap gap-3">
-            <button
-              type="button"
-              class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-950"
-              @click="refreshLocation"
-            >
-              Update location
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 transition hover:border-orange-400 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="isLoading || !userPosition"
-              @click="loadNearestPlugs"
-            >
-              {{ isLoading ? 'Loading...' : 'Reload data' }}
-            </button>
+          <div class="w-full rounded-lg border border-slate-200 bg-white p-4 lg:w-72">
+            <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Nearest</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-950">
+              {{ nearestPlug ? formatDistance(nearestPlug.distanceMeters) : '-' }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600">
+              {{ nearestPlug ? `${nearestPlug.name} · ${nearestPlug.buildingName}` : 'No ranked plugs yet' }}
+            </p>
           </div>
         </div>
       </header>
 
-      <section class="mt-6 grid shrink-0 gap-3 sm:grid-cols-3">
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-          <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Plugs</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950">{{ plugItems.length }}</p>
-          <p class="mt-1 text-sm text-slate-600">Returned by the campus endpoint</p>
-        </div>
-
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-          <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Nearest</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950">
-            {{ nearestPlug ? formatDistance(nearestPlug.distanceMeters) : '-' }}
-          </p>
-          <p class="mt-1 text-sm text-slate-600">
-            {{ nearestPlug ? `${nearestPlug.name} · ${nearestPlug.buildingName}` : 'No ranked plugs yet' }}
-          </p>
-        </div>
-
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-          <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Location</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-950">{{ locationStatusLabel }}</p>
-          <p class="mt-1 text-sm text-slate-600">{{ locationStatusDetail }}</p>
-        </div>
-      </section>
-
-      <section class="mt-4 flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-500">
-        <p>Last refresh: {{ lastUpdatedLabel }}</p>
-        <p v-if="userPosition">Coordinates: {{ formatCoordinates(userPosition.latitude, userPosition.longitude) }}</p>
-      </section>
-
       <section class="mt-6 min-h-0 flex-1 pb-8">
-        <div v-if="isLoading" class="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        <div v-if="isLoading && plugItems.length === 0" class="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
           Loading ranked plugs...
         </div>
 
         <div
-          v-else-if="loadError"
+          v-else-if="loadError && plugItems.length === 0"
           class="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700"
         >
           {{ loadError }}
@@ -502,15 +425,17 @@ onBeforeUnmount(() => {
           No plugs were returned for this location.
         </div>
 
-        <div v-else class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div v-else class="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white">
           <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
             <span>Showing all {{ plugItems.length }} returned plugs</span>
-            <span v-if="nearestPlug">Nearest: {{ formatDistance(nearestPlug.distanceMeters) }}</span>
+            <span v-if="isLoading">Refreshing data...</span>
+            <span v-else-if="loadError">Refresh failed. Showing existing data.</span>
+            <span v-else-if="nearestPlug">Nearest: {{ formatDistance(nearestPlug.distanceMeters) }}</span>
           </div>
 
-          <div class="max-h-[65dvh] overflow-auto">
+          <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead class="sticky top-0 z-10 bg-slate-100 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <thead class="bg-slate-100 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <tr>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Rank</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Room</th>
