@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
         <h1>{{ currentUser ? 'Your PolinSight account.' : 'Welcome to PolinSight.' }}</h1>
         <p class="intro-copy">
           {{ currentUser
-            ? 'Review your account information or securely sign out when you are finished.'
+            ? 'Here you can see your account details'
             : 'Sign in to continue exploring campus services, guided tours, and useful insights.'
           }}
         </p>
@@ -165,7 +165,6 @@ onBeforeUnmount(() => {
             <div class="login-copy">
               <p class="eyebrow">Account profile</p>
               <h2>Your profile</h2>
-              <p>Your current authentication details.</p>
             </div>
           </div>
 
