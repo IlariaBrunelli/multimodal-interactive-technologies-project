@@ -1351,7 +1351,11 @@ onBeforeUnmount(() => {
       </section>
 
       <!-- Sezione chatbot. -->
-      <section aria-label="Campus AI Assistant" class="chatbot-section">
+      <section
+        :class="{ 'chatbot-section--ar': isArMode }"
+        aria-label="Campus AI Assistant"
+        class="chatbot-section"
+      >
         <div 
           :class="{ 'chatbot-card--dragging': isSheetDragging, 'transition-all duration-300': !isSheetDragging }"
           :style="{ transform: (isArMode && sheetDragY > 0) ? `translateY(${sheetDragY}px)` : 'translateY(0px)' }"
@@ -1815,7 +1819,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   flex: 1; /* take remaining vertical space */
   min-height: 0; /* needed for flex children to shrink */
-  transition: flex 0.3s ease;
+  transition: flex 0.3s ease, padding-top 0.3s ease;
 }
 
 .chatbot-card {
@@ -2102,6 +2106,11 @@ onBeforeUnmount(() => {
   .chatbot-card {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .chatbot-section--ar {
+    /* Keep the AR status card above the assistant sheet instead of over it. */
+    padding-top: 166px;
   }
 
   .chatbot-heading {
