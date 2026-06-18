@@ -3,6 +3,44 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/tailwind.css'],
+  modules: ['@vite-pwa/nuxt'],
+  pwa: {
+    registerType: 'autoUpdate',
+    manifest: {
+      name: 'PolinSight',
+      short_name: 'PolinSight',
+      description: 'Polimi Campus Companion',
+      theme_color: '#ffffff',
+      background_color: '#ffffff',
+      display: 'standalone',
+      icons: [
+        {
+          src: 'pwa-192x192.png',
+          sizes: '192x192',
+          type: 'image/png'
+        },
+        {
+          src: 'pwa-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'any maskable'
+        }
+      ]
+    },
+    workbox: {
+      navigateFallback: '/',
+      globPatterns: ['**/*.{js,css,html,png,svg,ico}']
+    },
+    client: {
+      installPrompt: true,
+    },
+    devOptions: {
+      enabled: true,
+      suppressWarnings: true,
+      navigateFallbackAllowlist: [/^\/$/],
+      type: 'module',
+    },
+  },
   postcss: {
     plugins: {
       tailwindcss: {},

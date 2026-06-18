@@ -627,8 +627,8 @@ function requestGuidedTourBuildingDetails() {
 .ar-empty-state {
   position: absolute;
   left: 24px;
-  top: 154px;
-  transform: none;
+  top: 50%;
+  transform: translateY(-50%);
   width: min(340px, calc(100vw - 36px));
   padding: 14px 16px;
   border-radius: 12px;
@@ -776,7 +776,8 @@ function requestGuidedTourBuildingDetails() {
   .ar-empty-state {
     left: 12px;
     right: 12px;
-    top: 154px;
+    top: 50%;
+    transform: translateY(-50%);
     width: auto;
   }
 

@@ -363,38 +363,37 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main ref="servicePage" class="h-dvh overflow-y-auto bg-slate-50 text-slate-950">
+  <main ref="servicePage" class="h-dvh overflow-y-auto text-slate-950 relative">
+    <div class="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(16,44,83,0.15),transparent_30%),linear-gradient(180deg,#ffffff_0%,#e0dcdc_100%)]"></div>
     <section class="mx-auto flex min-h-full max-w-6xl flex-col px-4 py-6 sm:px-6 lg:px-8">
       <header
-        class="sticky top-0 z-20 shrink-0 cursor-pointer border-b border-slate-200 bg-slate-50/95 pb-5 backdrop-blur"
-        @click="scrollToTop"
+        class="shrink-0 pb-6"
       >
         <NuxtLink
           to="/"
-          class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+          class="mb-6 inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-slate-300/40 bg-white/80 px-4 pl-3 font-[800] text-[#102C53] shadow-[0_14px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(15,23,42,0.12)]"
           @click.stop
         >
-          <span aria-hidden="true">&larr;</span>
+          <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" class="h-5 w-5 stroke-current stroke-[2.2px] [stroke-linecap:round] [stroke-linejoin:round]">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
           <span>Back home</span>
         </NuxtLink>
 
-        <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div class="space-y-2">
-            <p class="text-sm font-medium uppercase tracking-[0.16em] text-slate-500">Main Services</p>
-            <h1 class="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Plugs</h1>
-            <p class="max-w-2xl text-sm text-slate-600 sm:text-base">
-              Ranked by distance from your current location.
-            </p>
+            <h1 class="text-3xl font-semibold tracking-tight text-[#102C53] sm:text-4xl">Plugs</h1>
           </div>
 
-          <div class="w-full rounded-lg border border-slate-200 bg-white p-4 lg:w-72">
-            <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Nearest</p>
-            <p class="mt-2 text-2xl font-semibold text-slate-950">
-              {{ nearestPlug ? formatDistance(nearestPlug.distanceMeters) : '-' }}
-            </p>
-            <p class="mt-1 text-sm text-slate-600">
-              {{ nearestPlug ? `${nearestPlug.name} · ${nearestPlug.buildingName}` : 'No ranked plugs yet' }}
-            </p>
+          <div class="w-full rounded-2xl border border-slate-200 bg-white/90 p-5 lg:w-96 shadow-[0_8px_30px_rgba(15,23,42,0.04)] backdrop-blur">
+            <p class="text-[0.84rem] font-[800] uppercase tracking-[0.18em] text-[#102C53] mb-3">Nearest</p>
+            <div class="flex items-end justify-between gap-4">
+              <div class="flex flex-col">
+                <span class="text-lg font-[800]">{{ nearestPlug ? nearestPlug.name : 'No ranked plugs yet' }}</span>
+                <span v-if="nearestPlug" class="text-[0.84rem] font-medium opacity-80">{{ nearestPlug.buildingName }}</span>
+              </div>
+              <span class="text-lg font-[800] text-[#102C53] whitespace-nowrap">{{ nearestPlug ? formatDistance(nearestPlug.distanceMeters) : '-' }}</span>
+            </div>
           </div>
         </div>
       </header>
@@ -426,23 +425,17 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else class="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white">
-          <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-            <span>Showing all {{ plugItems.length }} returned plugs</span>
-            <span v-if="isLoading">Refreshing data...</span>
-            <span v-else-if="loadError">Refresh failed. Showing existing data.</span>
-            <span v-else-if="nearestPlug">Nearest: {{ formatDistance(nearestPlug.distanceMeters) }}</span>
-          </div>
 
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead class="bg-slate-100 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <thead class="bg-slate-100 text-[0.84rem] font-[800] uppercase tracking-[0.12em] text-slate-500">
                 <tr>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Rank</th>
+                  <th scope="col" class="whitespace-nowrap px-4 py-3 text-right">Distance</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Room</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Building</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3">Alias</th>
                   <th scope="col" class="whitespace-nowrap px-4 py-3 text-right">Capacity</th>
-                  <th scope="col" class="whitespace-nowrap px-4 py-3 text-right">Distance</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200">
@@ -454,6 +447,9 @@ onBeforeUnmount(() => {
                   <td class="whitespace-nowrap px-4 py-4 font-semibold text-orange-700">
                     {{ plug.rank }}
                   </td>
+                  <td class="whitespace-nowrap px-4 py-4 text-right font-semibold text-slate-950">
+                    {{ formatDistance(plug.distanceMeters) }}
+                  </td>
                   <td class="whitespace-nowrap px-4 py-4 font-medium text-slate-950">
                     {{ plug.name }}
                   </td>
@@ -464,9 +460,6 @@ onBeforeUnmount(() => {
                     {{ plug.buildingAlias }}
                   </td>
                   <td class="whitespace-nowrap px-4 py-4 text-right text-slate-700">{{ plug.capacity }}</td>
-                  <td class="whitespace-nowrap px-4 py-4 text-right font-semibold text-slate-950">
-                    {{ formatDistance(plug.distanceMeters) }}
-                  </td>
                 </tr>
               </tbody>
             </table>

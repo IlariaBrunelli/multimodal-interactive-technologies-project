@@ -2,8 +2,42 @@
 import type { Session } from '@supabase/supabase-js'
 import type { ArPermissionState, CampusArPosition } from '~/composables/useCampusAr'
 import type { CampusBuilding } from '~/data/campusBuildings'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { getChatLocationCoordinates } from '~/composables/useChatLocation'
 import { useCampusAr } from '~/composables/useCampusAr'
+
+// Configura marked per usare line breaks come \n
+marked.setOptions({
+  breaks: true,
+  gfm: true
+})
+
+const renderMarkdown = (text: string) => {
+  const parsed = marked.parse(text) as string
+  // DOMPurify needs the window object. During server-side rendering, we skip sanitization
+  // because the initial messages are hardcoded and trusted.
+  if (typeof window !== 'undefined') {
+    return DOMPurify.sanitize(parsed)
+  }
+  return parsed
+}
+
+const showSplash = ref(false)
+
+onMounted(() => {
+  if (import.meta.client && !window.sessionStorage.getItem('splashShown')) {
+    showSplash.value = true
+  }
+})
+
+function closeSplash() {
+  showSplash.value = false
+  if (import.meta.client) {
+    window.sessionStorage.setItem('splashShown', 'true')
+  }
+}
 
 // In Nuxt/Vue, <script setup> rende disponibili variabili e funzioni direttamente nel template.
 // lang="ts" significa che questo blocco usa TypeScript, quindi possiamo dichiarare tipi.
@@ -161,7 +195,7 @@ const buttons = ref<MenuButton[]>([
 // Array costante con i suggerimenti iniziali della chat.
 const starterPrompts = [
   'Where is the admissions office?',
-  'What are the library opening hours?'
+  'Which are my next events?'
 ] as const
 
 // Lista reattiva dei messaggi della chat.
@@ -169,7 +203,7 @@ const starterPrompts = [
 const chatMessages = ref<ChatMessage[]>([
   {
     role: 'assistant',
-    text: 'A first chatbot concept for asking questions about the campus, services, offices, directions, and student support.'
+    text: 'This is Campus AI Assistant of PoliMi.\nBased on your position I can speak about:\n\n- Your schedule (fetched from your calendar)\n- Microwaves\n- Water Fountains\n- Plugs\n- Food & Drinks\n- Building infos'
   }
 ])
 
@@ -178,6 +212,7 @@ const userPrompt = ref('')
 
 // Stato di caricamento della chat mentre aspettiamo la risposta dell'agente n8n.
 const isChatLoading = ref(false)
+const showInfoPopup = ref(false)
 const authClient = useSupabaseClient()
 const currentAuthSession = ref<Session | null>(null)
 const isAuthReady = ref(false)
@@ -353,7 +388,7 @@ function onSheetPointerDown(e: PointerEvent) {
       if (currentDragY > 100 && dragDelta < -AR_SHEET_REOPEN_DRAG_THRESHOLD) {
         sheetDragY.value = 0
       } else if (sheetDragY.value > 100) {
-        sheetDragY.value = getArSheetMaxDown()
+        sheetDragY.value = maxSheetDragDown
       } else if (sheetDragY.value < -100) {
         sheetDragY.value = -maxDragDistance // Snap to full height
       } else {
@@ -411,10 +446,15 @@ function handleChatScroll() {
 
 watch(chatMessages, () => {
   nextTick(() => {
-    if (chatbotWindow.value) {
-      chatbotWindow.value.scrollTop = chatbotWindow.value.scrollHeight
-      handleChatScroll()
-    }
+    setTimeout(() => {
+      if (chatbotWindow.value) {
+        chatbotWindow.value.scrollTo({
+          top: chatbotWindow.value.scrollHeight,
+          behavior: 'smooth'
+        })
+        handleChatScroll()
+      }
+    }, 50)
   })
 }, { deep: true })
 
@@ -1005,11 +1045,14 @@ async function enableArMode() {
   isGuidedTourActive.value = false
   guidedTourNsteps.value = 0
   guidedTourError.value = null
-  sheetDragY.value = 0
   clearSelectedArBuildingDetails()
   const buildingLoadPromise = loadCampusBuildings()
   await requestArAccess()
   await buildingLoadPromise
+  
+  nextTick(() => {
+    sheetDragY.value = getArSheetMaxDown()
+  })
 }
 
 async function enableGuidedTourMode() {
@@ -1021,11 +1064,14 @@ async function enableGuidedTourMode() {
   isGuidedTourActive.value = true
   guidedTourNsteps.value = 0
   guidedTourError.value = null
-  sheetDragY.value = 0
   clearSelectedArBuildingDetails()
   const guidedTourLoadPromise = loadGuidedTour()
   await requestArAccess()
   await guidedTourLoadPromise
+  
+  nextTick(() => {
+    sheetDragY.value = getArSheetMaxDown()
+  })
 }
 
 function disableArMode() {
@@ -1073,7 +1119,10 @@ function completeGuidedTourStep() {
 
 async function toggleGuidedTourMode() {
   if (isGuidedTourActive.value) {
-    disableArMode()
+    isGuidedTourActive.value = false
+    guidedTourNsteps.value = 0
+    guidedTourError.value = null
+    clearSelectedArBuildingDetails()
     return
   }
 
@@ -1105,6 +1154,11 @@ async function submitChat() {
     return
   }
 
+  // Remove introductory message if it exists
+  if (chatMessages.value.length === 1 && chatMessages.value[0].role === 'assistant') {
+    chatMessages.value = []
+  }
+
   isChatLoading.value = true
 
   // push aggiunge un nuovo messaggio dell'utente alla lista reattiva.
@@ -1116,7 +1170,7 @@ async function submitChat() {
   // Aggiunge un messaggio temporaneo mentre la route server interroga n8n.
   const assistantMessageIndex = chatMessages.value.push({
     role: 'assistant',
-    text: 'Sto elaborando la tua richiesta...'
+    text: 'I\'m thinking...'
   }) - 1
 
   // Svuota l'input dopo l'invio.
@@ -1208,6 +1262,41 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <div v-if="showSplash" class="fixed inset-0 z-[100] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+    <h1 class="text-[1.6rem] font-[800] text-[#102C53] tracking-[-0.03em] mb-2">PolinSight</h1>
+    <p class="text-[clamp(1rem,2vw,1.1rem)] text-[#102C53]/80 mb-8 max-w-sm leading-snug">Welcome to your Polimi Campus companion</p>
+    <button @click="closeSplash" class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl bg-[#102C53] px-8 py-3 font-[800] text-white shadow-[0_14px_30px_rgba(15,23,42,0.12)] transition-transform hover:-translate-y-0.5 active:translate-y-0">
+      Let's start
+    </button>
+  </div>
+
+  <div v-if="showInfoPopup" class="fixed inset-0 z-[100] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+    <div class="max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl text-left">
+      <h3 class="font-[800] text-[#102C53] text-lg mb-2">Campus AI Assistant</h3>
+      <p class="text-[0.84rem] text-slate-700 mb-2">This is Campus AI Assistant of PoliMi.<br>Based on your position I can speak about:</p>
+      <ul class="text-[0.84rem] text-slate-700 list-disc pl-5 mb-6 text-left space-y-1">
+        <li>Your schedule (fetched from your calendar)</li>
+        <li>Microwaves</li>
+        <li>Water Fountains</li>
+        <li>Plugs</li>
+        <li>Food & Drinks</li>
+        <li>Building infos</li>
+      </ul>
+      <button @click="showInfoPopup = false" class="w-full inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#102C53] font-[800] text-white transition-transform hover:-translate-y-0.5 active:translate-y-0">Got it</button>
+    </div>
+  </div>
+
+  <button
+    v-if="isExpanded"
+    class="fixed left-5 top-5 inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-slate-300/40 bg-white/80 px-4 pl-3 font-[800] text-[#102C53] shadow-[0_14px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform transition-shadow duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(15,23,42,0.12)] z-[60]"
+    @click.stop="toggleExpand"
+  >
+    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" class="h-5 w-5 stroke-current stroke-[2.2px] [stroke-linecap:round] [stroke-linejoin:round]">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+    <span>Back home</span>
+  </button>
+
   <main :class="{ 'bg-black': isArMode }" class="home-shell">
     <!-- Camera background -->
     <video 
@@ -1256,10 +1345,15 @@ onBeforeUnmount(() => {
     <div :class="isArMode ? 'opacity-0' : 'opacity-80'" class="background-orb orb-left transition-opacity duration-500" />
     <div :class="isArMode ? 'opacity-0' : 'opacity-80'" class="background-orb orb-right transition-opacity duration-500" />
 
+    <!-- Brand Name (Top Left) -->
+    <div :class="isArMode || isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'" class="brand-name transition-opacity duration-500">
+      PolinSight
+    </div>
+
     <!-- Pulsante Speak -->
     <button
       type="button"
-      :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'"
+      :class="isArMode || isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'"
       class="speak-btn transition-opacity duration-500"
       @click="toggleSpeak"
       :aria-label="isSpeakEnabled ? 'Disable voice' : 'Enable voice'"
@@ -1273,7 +1367,7 @@ onBeforeUnmount(() => {
     </button>
 
     <!-- Pulsante Login -->
-    <NuxtLink :class="isArMode ? 'opacity-0 pointer-events-none' : 'opacity-100'" aria-label="Open account page" class="login-link transition-opacity duration-500" to="/login">
+    <NuxtLink :class="isArMode || isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'" aria-label="Open account page" class="login-link transition-opacity duration-500" to="/login">
       <svg aria-hidden="true" viewBox="0 0 24 24">
         <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
       </svg>
@@ -1282,41 +1376,19 @@ onBeforeUnmount(() => {
     <section class="home-panel">
       <!-- Card principale della pagina. -->
       <div :class="isArMode ? '!bg-transparent !border-transparent !shadow-none !backdrop-blur-none !p-0 !m-0 pointer-events-none' : ''" class="hero-card transition-all duration-500">
-        <div 
-          :class="[
-            !isSheetDragging ? 'transition-all duration-300' : '',
-            isArMode ? 'opacity-0 pointer-events-none translate-y-[-20px]' : ''
-          ]"
-          :style="{
-            opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 2),
-            height: isArMode ? '0px' : `${(1 - sheetProgress) * 132}px`,
-            transform: isArMode ? 'translateY(-20px)' : `scale(${1 - sheetProgress * 0.1})`,
-            overflow: 'hidden',
-            transformOrigin: 'top center'
-          }"
-          class="transition-all duration-300"
-        >
-          <h1>PolinSight</h1>
-          <p class="hero-copy">
-            Welcome to your Polimi campus companion.
-          </p>
-          <p class="hero-section-title">AR Experience</p>
-          <p class="hero-copy hero-copy-compact">
-            Look through the camera to find nearby buildings and ask for useful insights.
-          </p>
-        </div>
+
         
         <div 
           :class="isArMode ? 'fixed top-6 left-6 z-50 flex-row items-center gap-4 pointer-events-auto' : 'relative flex-row justify-center gap-[14px]'"
           class="hero-actions transition-all duration-700 ease-[cubic-bezier(0.34,1.1,0.64,1)]"
         >
-          <button :class="{ 'ar-button-active': isArMode && !isGuidedTourActive }" class="hero-button" type="button" @click="toggleArMode">
+          <button :class="{ 'ar-button-active': isArMode }" class="hero-button" type="button" @click="toggleArMode">
             <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
               <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
               <line x1="12" x2="12" y1="22.08" y2="12" />
             </svg>
-            {{ isArMode ? (isGuidedTourActive ? 'Exit Tour' : 'Exit AR Mode') : 'AR Mode' }}
+            {{ isArMode ? 'Exit AR Mode' : 'AR Mode' }}
           </button>
           <button
             :class="[{ 'ar-button-active': isGuidedTourActive }, isArMode ? 'translate-x-0' : '']"
@@ -1324,8 +1396,40 @@ onBeforeUnmount(() => {
             type="button"
             @click="toggleGuidedTourMode"
           >
-            Guided Tour
+            {{ isGuidedTourActive ? 'Stop Tour' : 'Guided Tour' }}
           </button>
+
+          <button
+            v-if="isArMode"
+            type="button"
+            class="flex items-center justify-center w-[46px] h-[46px] rounded-[18px] bg-white/20 text-white backdrop-blur border border-white/20 transition-all hover:bg-white/30"
+            @click="toggleSpeak"
+            :aria-label="isSpeakEnabled ? 'Disable voice' : 'Enable voice'"
+          >
+            <svg v-if="isSpeakEnabled" viewBox="0 0 24 24" aria-hidden="true" class="w-5 h-5 fill-current">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true" class="w-5 h-5 fill-current">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div 
+          :class="[
+            !isSheetDragging ? 'transition-all duration-300' : '',
+            isArMode ? 'opacity-0 pointer-events-none translate-y-[20px]' : ''
+          ]"
+          :style="{
+            opacity: isArMode ? 0 : Math.max(0, 1 - sheetProgress * 2),
+            height: isArMode ? '0px' : `${(1 - sheetProgress) * 44}px`,
+            overflow: 'hidden'
+          }"
+          class="transition-all duration-300 mt-2"
+        >
+          <p class="hero-copy hero-copy-compact m-0 leading-snug">
+            Look through the camera to find nearby buildings and ask for useful insights.
+          </p>
         </div>
       </div>
 
@@ -1354,17 +1458,25 @@ onBeforeUnmount(() => {
               @click="!isExpanded && toggleExpand()"
             >
               <div
-                :class="isExpanded ? 'mb-16 sm:mb-20' : 'mb-6'"
-                class="flex items-center justify-between transition-all duration-500"
+                :class="isExpanded ? 'mb-16 sm:mb-20 justify-start' : 'mb-6 justify-between'"
+                class="flex items-center transition-all duration-500 relative"
               >
                 <span
-                  :class="isExpanded ? 'text-3xl sm:text-4xl' : 'text-[clamp(1.4rem,2.5vw,2.2rem)]'"
-                  class="transition-all duration-500"
+                  v-if="!isExpanded"
+                  class="text-[1.4rem] font-[800] text-[#102C53] tracking-[-0.03em] transition-all duration-500"
+                >
+                  Main Services
+                </span>
+                
+                <span
+                  v-else
+                  class="text-[1.4rem] font-[800] text-[#102C53] tracking-[-0.03em] transition-all duration-500 block w-full text-center mt-20"
                 >
                   Main Services
                 </span>
 
                 <button
+                  v-if="!isExpanded"
                   :aria-expanded="isExpanded"
                   :aria-label="isExpanded ? 'Close services menu' : 'Open services menu'"
                   :class="isExpanded ? 'text-gray-400' : 'text-[#102C53]'"
@@ -1399,7 +1511,7 @@ onBeforeUnmount(() => {
                 :class="isExpanded ? 'flex-1 justify-start max-w-3xl mx-auto' : 'justify-start'"
                 class="transition-all duration-500 flex flex-col w-full"
               >
-                <div :style="{ height: isExpanded ? `${Math.ceil(buttons.length / 2) * 104 - 18}px` : '56px' }" class="relative w-full">
+                <div :style="{ height: isExpanded ? `${Math.ceil(buttons.length / 2) * 104 - 18}px` : '56px' }" :class="['relative w-full transition-transform duration-500', isExpanded ? '' : '-translate-y-3']">
                   <button
                     v-for="(button, index) in buttons"
                     :key="button.id"
@@ -1415,7 +1527,7 @@ onBeforeUnmount(() => {
                       height: isExpanded ? '80px' : '56px',
                       borderRadius: isExpanded ? '1.5rem' : '50%'
                     }"
-                    class="absolute transition-all duration-500 flex items-center justify-center overflow-hidden group focus:outline-none border-2"
+                    class="absolute transition-all duration-500 flex items-center justify-center group focus:outline-none border-2"
                     type="button"
                     @click.stop="goToPage(button)"
                   >
@@ -1431,6 +1543,13 @@ onBeforeUnmount(() => {
                     >
                       <path :d="button.iconPath" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
+                    <span
+                      :class="isExpanded ? 'opacity-0 translate-y-[5px] pointer-events-none' : 'opacity-100 translate-y-0 pointer-events-none'"
+                      :style="{ transitionDelay: isExpanded ? '0ms' : `${(buttons.length - 1 - index) * 40 + 200}ms` }"
+                      class="absolute -bottom-[28px] w-[100px] text-[0.84rem] font-[800] leading-tight text-center tracking-tight text-[#102C53] transition-all duration-[400ms]"
+                    >
+                      {{ button.text }}
+                    </span>
 
                     <div
                       :class="isExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-75'"
@@ -1447,18 +1566,12 @@ onBeforeUnmount(() => {
                       >
                         <path :d="button.iconPath" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
-                      <span class="font-bold text-[1.05rem] sm:text-xl tracking-tight leading-tight text-left">{{ button.text }}</span>
+                      <span class="font-[800] text-[1.05rem] sm:text-xl tracking-tight leading-tight text-left">{{ button.text }}</span>
                     </div>
                   </button>
                 </div>
               </div>
 
-              <div
-                :class="isExpanded ? 'opacity-100 delay-500' : 'opacity-0 absolute bottom-0 pointer-events-none w-full left-0'"
-                class="transition-all duration-500 text-center text-gray-300 pb-8"
-              >
-                <p class="uppercase tracking-widest text-xs font-bold">Menu Navigazione</p>
-              </div>
               </div>
             </div>
       </section>
@@ -1484,7 +1597,14 @@ onBeforeUnmount(() => {
 
           <div class="ai-assistant-block">
             <div class="chatbot-heading">
-              <h2 id="campus-ai-title">Campus AI Assistant</h2>
+              <div class="flex items-center gap-2">
+                <button type="button" @click="showInfoPopup = true" class="text-[#102C53] hover:text-[#1a427a]">
+                  <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                <h2 id="campus-ai-title" class="text-[1.4rem] font-[800] tracking-[-0.03em] text-[#102C53]">Campus AI Assistant</h2>
+              </div>
               <NuxtLink
                 v-if="isAuthReady && !isAssistantAvailable"
                 class="chat-auth-notice"
@@ -1494,7 +1614,7 @@ onBeforeUnmount(() => {
               </NuxtLink>
             </div>
             
-            <div aria-label="Suggested prompts" class="prompt-list">
+            <div v-if="isAssistantAvailable && chatMessages.length === 1 && chatMessages[0].role === 'assistant'" aria-label="Suggested prompts" class="prompt-list">
               <button
                 v-for="prompt in starterPrompts"
                 :key="prompt"
@@ -1522,11 +1642,15 @@ onBeforeUnmount(() => {
             <div
               v-for="(message, index) in chatMessages"
               :key="`${message.role}-${index}`"
+              v-show="isAssistantAvailable || !(chatMessages.length === 1 && message.role === 'assistant')"
               :class="`message-row--${message.role}`"
               class="message-row"
             >
-              <div :class="`message-bubble--${message.role}`" class="message-bubble">
-                {{ message.text }}
+              <div 
+                :class="`message-bubble--${message.role}`" 
+                class="message-bubble markdown-body"
+                v-html="renderMarkdown(message.text)"
+              >
               </div>
             </div>
           </div>
@@ -1562,7 +1686,7 @@ onBeforeUnmount(() => {
                 <line x1="22" x2="11" y1="2" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
               </svg>
-              <span v-else class="text-xs">...</span>
+              <span v-else class="text-[0.84rem]">...</span>
             </button>
           </form>
         </div>
@@ -1609,6 +1733,17 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 16px;
+}
+
+.brand-name {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  z-index: 2;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #102C53;
+  letter-spacing: -0.03em;
 }
 
 .background-orb {
@@ -1727,12 +1862,6 @@ onBeforeUnmount(() => {
   color: #102C53;
 }
 
-.hero-card h1 {
-  margin: 0;
-  font-size: clamp(1.4rem, 2.5vw, 2.2rem); /* reduced size */
-  line-height: 1.05;
-}
-
 .hero-copy {
   max-width: 520px;
   margin: 10px auto 12px;
@@ -1743,7 +1872,7 @@ onBeforeUnmount(() => {
 
 .hero-section-title {
   margin: 4px 0 0;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1756,11 +1885,11 @@ onBeforeUnmount(() => {
 }
 
 .hero-button {
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 12px 24px;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1773,7 +1902,6 @@ onBeforeUnmount(() => {
 }
 
 .hero-button:hover {
-  transform: translateY(-2px);
   box-shadow: 0 20px 34px rgba(16, 44, 83, 0.35);
 }
 
@@ -2018,7 +2146,6 @@ onBeforeUnmount(() => {
 
 .chatbot-heading h2 {
   margin: 0;
-  font-size: clamp(1.1rem, 2vw, 1.4rem); /* reduced size */
   color: #102C53;
 }
 
@@ -2029,7 +2156,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   color: #102C53;
   background: rgba(219, 234, 254, 0.62);
-  font-size: 0.72rem;
+  font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.3;
   text-align: center;
@@ -2047,7 +2174,7 @@ onBeforeUnmount(() => {
   padding: 8px 12px; /* reduced */
   background: linear-gradient(135deg, rgba(224, 220, 220, 0.95), #ffffff);
   color: #102C53;
-  font-size: 0.8rem; /* reduced */
+  font-size: 0.84rem; /* reduced */
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -2093,6 +2220,8 @@ onBeforeUnmount(() => {
 
 .message-row {
   display: flex;
+  min-width: 0;
+  width: 100%;
 }
 
 .message-row--assistant {
@@ -2105,10 +2234,70 @@ onBeforeUnmount(() => {
 
 .message-bubble {
   max-width: min(90%, 380px);
+  min-width: 0;
   padding: 10px 14px; /* reduced */
   border-radius: 18px;
   line-height: 1.4;
   font-size: 0.85rem; /* reduced */
+  white-space: normal; /* Cambiato a normal perché l'HTML del markdown ha i <br> e <p> */
+  word-break: break-word;
+  overflow-x: auto; /* ensure bubble itself doesn't break if anything overflows */
+}
+
+/* Stili specifici per il contenuto Markdown */
+:deep(.markdown-body) {
+  font-family: inherit;
+}
+
+:deep(.markdown-body) ul {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+:deep(.markdown-body) li {
+  margin-bottom: 0.25em;
+}
+
+:deep(.markdown-body) p {
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+:deep(.markdown-body) p:last-child {
+  margin-bottom: 0;
+}
+
+:deep(.markdown-body) table {
+  display: block;
+  max-width: 100%;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  font-size: 0.75rem; /* Reduced font size for compactness */
+  background-color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 6px;
+}
+
+:deep(.markdown-body) th,
+:deep(.markdown-body) td {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  padding: 4px 6px; /* Drastically reduced padding */
+  text-align: left;
+  white-space: nowrap; /* Prevent wrapping inside cells */
+}
+
+:deep(.markdown-body) th {
+  background-color: rgba(148, 163, 184, 0.2);
+  font-weight: 600;
+}
+
+:deep(.markdown-body) tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .message-bubble--assistant {
@@ -2150,7 +2339,8 @@ onBeforeUnmount(() => {
 
 .chatbot-mic-button:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: 0.3;
+  filter: grayscale(100%);
 }
 
 .chatbot-mic-button--listening {
@@ -2191,7 +2381,8 @@ onBeforeUnmount(() => {
 
 .chatbot-input:disabled {
   cursor: not-allowed;
-  opacity: 0.72;
+  opacity: 0.3;
+  filter: grayscale(100%);
 }
 
 /* Pulsante invio della chat. */
@@ -2209,7 +2400,8 @@ onBeforeUnmount(() => {
 
 .chatbot-send:disabled {
   cursor: not-allowed;
-  opacity: 0.72;
+  opacity: 0.3;
+  filter: grayscale(100%);
 }
 
 /* Classe standard per testo visibile agli screen reader ma nascosto graficamente. */

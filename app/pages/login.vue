@@ -25,11 +25,11 @@ const displayName = computed(() => {
   ]
   const name = candidates.find((value) => typeof value === 'string' && value.trim())
 
-  return typeof name === 'string' ? name.trim() : 'name not provided'
+  return typeof name === 'string' ? name.trim() : 'Name Surname'
 })
 const accountEmail = computed(() => currentUser.value?.email?.trim() || 'Email not available')
 const profileInitial = computed(() => {
-  const source = displayName.value === 'name not provided'
+  const source = displayName.value === 'Name Surname'
     ? accountEmail.value
     : displayName.value
 
@@ -132,13 +132,7 @@ onBeforeUnmount(() => {
 
     <section class="login-card">
       <div class="login-intro">
-        <div class="brand-mark" aria-hidden="true">
-          <svg fill="none" viewBox="0 0 24 24">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4Z" />
-            <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
-          </svg>
-        </div>
-        <p class="eyebrow">PolinSight</p>
+        <div v-if="false" class="brand-mark" aria-hidden="true"></div>
         <h1>{{ currentUser ? 'Your PolinSight account.' : 'Welcome to PolinSight.' }}</h1>
         <p class="intro-copy">
           {{ currentUser
@@ -146,11 +140,7 @@ onBeforeUnmount(() => {
             : 'Sign in to continue exploring campus services, guided tours, and useful insights.'
           }}
         </p>
-        <div class="feature-list" aria-label="PolinSight features">
-          <span>Campus services</span>
-          <span>AR building discovery</span>
-          <span>Guided tours</span>
-        </div>
+
       </div>
 
       <div class="login-form-panel">
@@ -163,18 +153,11 @@ onBeforeUnmount(() => {
           <div class="profile-heading">
             <div class="profile-avatar" aria-hidden="true">{{ profileInitial }}</div>
             <div class="login-copy">
-              <p class="eyebrow">Account profile</p>
-              <h2>Your profile</h2>
+              <h2 class="!m-0">{{ displayName }}</h2>
             </div>
           </div>
 
           <dl class="account-details">
-            <div class="account-detail">
-              <dt>Display name</dt>
-              <dd :class="{ 'account-detail-placeholder': displayName === 'Display name not provided' }">
-                {{ displayName }}
-              </dd>
-            </div>
             <div class="account-detail">
               <dt>Email address</dt>
               <dd :class="{ 'account-detail-placeholder': accountEmail === 'Email not available' }">
@@ -195,9 +178,6 @@ onBeforeUnmount(() => {
 
         <template v-else>
           <div class="login-copy">
-            <p class="eyebrow">Account access</p>
-            <h2>Sign in</h2>
-            <p>Enter your account details.</p>
           </div>
 
           <form class="login-form" @submit.prevent="handleSubmit">
@@ -318,7 +298,7 @@ onBeforeUnmount(() => {
   color: var(--primary);
   background: var(--panel-bg);
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -398,7 +378,7 @@ onBeforeUnmount(() => {
   color: rgba(248, 250, 252, 0.92);
   background: rgba(255, 255, 255, 0.08);
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .login-form-panel {
@@ -479,7 +459,7 @@ onBeforeUnmount(() => {
   margin: 0;
   color: #0f172a;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
@@ -529,7 +509,7 @@ onBeforeUnmount(() => {
 .field span {
   color: #334155;
   font-size: 0.86rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .field input {
@@ -577,7 +557,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 8px;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #fff;
   background: linear-gradient(135deg, var(--primary), var(--primary-light));
   box-shadow: 0 16px 28px rgba(16, 44, 83, 0.28);
