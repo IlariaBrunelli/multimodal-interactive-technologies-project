@@ -3,29 +3,24 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/tailwind.css'],
-  postcss: {
-    plugins: {
-      tailwindcss: {},
-      autoprefixer: {},
-    },
-  },
   modules: ['@vite-pwa/nuxt'],
   pwa: {
     registerType: 'autoUpdate',
     manifest: {
-      name: 'Mita Fida',
-      short_name: 'MitaFida',
+      name: 'PolinSight',
+      short_name: 'PolinSight',
+      description: 'Polimi Campus Companion',
       theme_color: '#ffffff',
+      background_color: '#ffffff',
       display: 'standalone',
       icons: [
         {
-          src: '/pwa-192x192.png',
+          src: 'pwa-192x192.png',
           sizes: '192x192',
-          type: 'image/png',
-          purpose: 'any maskable'
+          type: 'image/png'
         },
         {
-          src: '/pwa-512x512.png',
+          src: 'pwa-512x512.png',
           sizes: '512x512',
           type: 'image/png',
           purpose: 'any maskable'
@@ -33,16 +28,34 @@ export default defineNuxtConfig({
       ]
     },
     workbox: {
+      navigateFallback: '/',
       globPatterns: ['**/*.{js,css,html,png,svg,ico}']
+    },
+    client: {
+      installPrompt: true,
     },
     devOptions: {
       enabled: true,
+      suppressWarnings: true,
+      navigateFallbackAllowlist: [/^\/$/],
       type: 'module',
+    },
+  },
+  postcss: {
+    plugins: {
+      tailwindcss: {},
+      autoprefixer: {},
     },
   },
 
   runtimeConfig: {
     n8nCampusChatWebhook: process.env.N8N_CAMPUS_CHAT_WEBHOOK || '',
+    n8nCampusDataWebhook:
+      process.env.N8N_CAMPUS_DATA_WEBHOOK ||
+      'http://localhost:5678/webhook/get-campus-data',
+    n8nGuidedTourStepsWebhook:
+      process.env.N8N_GUIDED_TOUR_STEPS_WEBHOOK ||
+      'http://localhost:5678/webhook/get-guided-tour-steps',
     public: {
       supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || '',
       supabaseAnonKey:
@@ -51,13 +64,13 @@ export default defineNuxtConfig({
         '',
     },
   },
-  
+
   vite: {
     server: {
       allowedHosts: true
     }
   },
-  
+
   sourcemap: {
     server: false,
     client: false

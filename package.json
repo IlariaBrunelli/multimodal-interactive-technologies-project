@@ -16,11 +16,14 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
+    "dompurify": "^3.4.11",
+    "marked": "^18.0.5",
     "nuxt": "^4.4.2",
     "vue": "^3.5.30",
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@vite-pwa/nuxt": "^1.1.1",
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
