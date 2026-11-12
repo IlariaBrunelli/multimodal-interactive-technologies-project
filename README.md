@@ -1,134 +1,44 @@
-### 1. System Requirements
-Before starting, ensure the new machine has the following installed:
-* **Node.js** (v18.x or newer is recommended for Nuxt 4) and **npm**
-* **Git** (to pull the repository)
-* **Cloudflared** (to expose the local server via a tunnel)
+# 🎓 Assistente multimodale per il campus – Multimodal Interactive Technologies Project
 
-### 2. Pull the Repository
-Open your terminal or command prompt, clone the project, and navigate into it:
-```bash
-git clone https://github.com/danielcarrozzo/mita_fadi
-cd mita_fadi
-```
+Progetto di gruppo per il corso di **Multimodal Interactive Technologies and Applications**, **Politecnico di Milano**.
 
-### 3. Install Dependencies
-Install all the required packages using npm:
-```bash
-npm install
-```
+Una **web app per smartphone** che aiuta gli studenti a orientarsi e a vivere il campus combinando più modalità di interazione: **realtà aumentata** con fotocamera e posizione, **chat con un assistente AI**, **voce** in ingresso e in uscita, mappe e calendario.
 
-### 4. Configure Environment Variables
-The application requires several environment variables (like Supabase credentials) to run properly:
-1. Copy the provided `.env.example` file to create a new `.env` file:
-   ```bash
-   cp .env.example .env
-   ```
-   *(If you are on Windows Command Prompt, use `copy .env.example .env`)*
-2. Open the newly created `.env` file and fill in your specific values:
-   ```env
-   NUXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
-   NUXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
-   N8N_CAMPUS_CHAT_WEBHOOK=<your-n8n-chat-webhook>
-   N8N_CAMPUS_DATA_WEBHOOK=http://localhost:5678/webhook/get-campus-data
-   N8N_GUIDED_TOUR_STEPS_WEBHOOK=http://localhost:5678/webhook/get-guided-tour-steps
-   ```
+## Il problema
 
-### 5. Build and Run the Application
-Build the Nuxt application for production and start the preview server. The `--host` flag ensures it binds to your network interfaces so the tunnel can access it:
-```bash
-npm run build && npm run preview -- --host
-```
-*The app will now be running locally, typically at `http://localhost:3000`.*
+Il campus è grande e le informazioni utili sono sparse: dove si trova un'aula, dove trovare una fontanella, un microonde o una presa, cosa c'è in un certo edificio, quali lezioni ci sono oggi. L'obiettivo è riunire tutto in un'unica app, usabile in movimento, che lasci scegliere allo studente il modo di interagire più comodo in quel momento: guardare, scrivere o parlare.
 
-### 6. Start the Cloudflare Tunnel
+## Funzionalità
 
-This project uses camera so here are some notes about it:
-- The app is built to be used on mobile devices.
-- Usually mobile device browsers block Camera feature used on addresses in local networks.
-- HTTP could not let the project work, HTTPS should be used instead.
+- **Modalità AR**: inquadrando il campus con la fotocamera, l'app usa la posizione per mostrare gli edifici vicini (entro 160 metri) all'altezza giusta sullo schermo, con la distanza aggiornata in tempo reale. Toccando un edificio se ne leggono i dettagli storici. Se la realtà aumentata non è disponibile, si passa a una mappa OpenStreetMap.
+- **Assistente AI in chat**: un assistente dedicato al campus, accessibile dopo il login, che conosce la posizione dell'utente e risponde alle domande sul Politecnico.
+- **Interazione vocale**: riconoscimento vocale per scrivere in chat parlando e sintesi vocale per ascoltare le risposte, sia in chat sia in modalità AR.
+- **Assistente calendario**: collegato al calendario dello studente, per consultare gli impegni della giornata.
+- **Visita guidata**: un percorso a tappe che accompagna l'utente alla scoperta del campus.
+- **Navigazione verso le aule**: indicazioni per raggiungere l'aula di destinazione.
+- **Servizi del campus**: mappe dedicate a fontanelle, microonde, prese elettriche e punti ristoro.
 
-For this reason is recommended to use Cloudflare Tunnel, a tunneling daemon that proxies traffic from the Cloudflare network to your origins.
+L'interfaccia segue l'identità visiva del Politecnico, l'app si può installare sullo smartphone direttamente dal browser ed è stata rifinita in base ai risultati di una **valutazione euristica**.
 
-Ensure you have downloaded the Cloudflare Tunnel executable. In your project directory, it should appear as a file named `cloudflared.exe`.
+## Architettura
 
-Leave the first terminal running. Open a **new, separate terminal window** in the folder containing your `cloudflared.exe` file, and expose your local server:
-```powershell
-.\cloudflared tunnel --url http://localhost:3000
-```
-*(If `cloudflared` is installed globally in your system's PATH rather than locally in the folder, you can omit the `.\` and just run `cloudflared tunnel --url http://localhost:3000`)* 
+| Livello | Tecnologie | Ruolo |
+|---|---|---|
+| Frontend | **Nuxt 4** (Vue), **TypeScript**, **Tailwind CSS** | Interfaccia mobile, modalità AR, voce, mappe |
+| Backend | Server API di Nuxt | Chat, dati del campus, visita guidata, calendario |
+| Dati e autenticazione | **Supabase** (login con sessioni JWT) | Utenti, edifici, servizi del campus |
+| Assistente AI | **n8n** (in Docker, con PostgreSQL) | Flussi dell'assistente in chat e dati per la visita guidata |
+| Mappe | **OpenStreetMap** | Mappa di riserva alla modalità AR |
+| Esposizione | **Cloudflare Tunnel** | HTTPS, necessario per usare la fotocamera da smartphone |
 
-Cloudflare will generate a public URL in the terminal output that you can use to access the app remotely.
+## Installazione
 
----
+La guida completa per installare e avviare l'app, configurare le variabili d'ambiente e gestire n8n (installazione, backup e ripristino dei workflow) è in **[SETUP.md](./SETUP.md)**.
 
-# n8n Setup, Backup & Restore Guide (Postgres & Worker)
+## Il team
 
-This guide covers how to set up n8n locally using the official Docker repository with PostgreSQL and background workers, and how to use the command line to export and import your workflows and credentials.
+[Daniel Carrozzo](https://github.com/danielcarrozzo), [Drea2001](https://github.com/Drea2001), [fabio-vokrri](https://github.com/fabio-vokrri), **[Ilaria Brunelli](https://github.com/IlariaBrunelli)**.
 
-## 1. Local Setup and Installation
+## Fonte e licenza
 
-First, clone the official n8n hosting repository and navigate to the specific setup folder for Postgres and workers.
-
-1. Open your terminal and clone the repository:
-   ```bash
-   git clone https://github.com/n8n-io/n8n-hosting.git
-   cd n8n-hosting/docker-compose/withPostgresAndWorker
-   ```
-
-2. Start the Docker containers in the background:
-   ```bash
-   docker compose up -d
-   ```
-
-3. Once it is running, open `http://localhost:5678` in your browser to access the dashboard and set up your owner account.
-
----
-
-## 2. Importing Workflows and Credentials
-
-When running this specific Docker Compose setup, your main n8n container is typically named `n8n-n8n-1`. To backup your data, you must run the export commands directly against this running container.
-
-You can check the name of the container for example with the command:
-```bash
-docker ps
-```
-You will find different names for the postgres, Redis and other containers. The one you want is the main one. It contains `n8n`.
-
-When you use the `--all` flag to export, n8n places all of your workflows into a single JSON file. Because the dashboard's "Import from File" button is only meant for single workflows, **you must use the command line to import a bulk backup file**.
-
-Since n8n is running inside the Docker container, you must first copy the backup files from your computer into the container, and then execute the import commands.
-
-Open your terminal in the folder where your `backup_workflows.json` (and/or `backup_credentials.json`) are located:
-
-**Step A: Copy the backup files into the container's temporary folder:**
-```bash
-docker cp backup_workflows.json n8n-n8n-1:/tmp/backup_workflows.json
-docker cp backup_credentials.json n8n-n8n-1:/tmp/backup_credentials.json
-```
-
-**Step B: Run the import commands inside the container:**
-```bash
-docker exec -it n8n-n8n-1 n8n import:workflow --input=/tmp/backup_workflows.json
-docker exec -it n8n-n8n-1 n8n import:credentials --input=/tmp/backup_credentials.json
-```
-
-As soon as these commands finish, refresh your n8n dashboard (`http://localhost:5678`) in your browser. You will see all of your workflows and credentials successfully restored!
-
----
-
-## 3. Exporting Workflows and Credentials
-
-Open your command prompt or PowerShell and run these commands:
-
-**Export all workflows:**
-```bash
-docker exec -it n8n-n8n-1 n8n export:workflow --all > backup_workflows.json
-```
-
-**Export all credentials:**
-*(Note: Because credentials are encrypted with a unique key, importing them on a completely different machine might require migrating your encryption key environment variable as well).*
-```bash
-docker exec -it n8n-n8n-1 n8n export:credentials --all > backup_credentials.json
-```
-
-The `.json` backup files will be generated in whatever folder your terminal is currently open in.
+Questo repository è un fork del repository del gruppo, [danielcarrozzo/mita_fadi](https://github.com/danielcarrozzo/mita_fadi), distribuito con licenza MIT (vedi [`LICENSE`](./LICENSE)).
